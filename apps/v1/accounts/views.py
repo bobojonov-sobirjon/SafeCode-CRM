@@ -13,13 +13,18 @@ from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
 import secrets
-from .models import CustomUser
+from .models import CustomUser, PurchasedService
 from .serializers import (
+    PurchasedServiceReadSerializer,
     RegisterSerializer, LoginSerializer, ProfileSerializer, 
     ChangePasswordSerializer, ForgotPasswordSerializer, ResetPasswordSerializer,
-    SimpleChangePasswordSerializer
+    SimpleChangePasswordSerializer, PurchasedServiceSerializer,
+    UserCreateSerializer, UserListSerializer, GroupSerializer, LogoutSerializer
 )
 from .error_handlers import get_error_message
+from django.contrib.auth.models import Group
+from django.contrib.contenttypes.models import ContentType
+from apps.v1.notification.models import Notification
 
 
 class RegisterAPIView(APIView):
@@ -31,24 +36,7 @@ class RegisterAPIView(APIView):
     @swagger_auto_schema(
         operation_description="Регистрация нового пользователя в системе",
         tags=['Accounts'],
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'first_name': openapi.Schema(type=openapi.TYPE_STRING, description='Имя пользователя'),
-                'last_name': openapi.Schema(type=openapi.TYPE_STRING, description='Фамилия пользователя'),
-                'id_organization': openapi.Schema(type=openapi.TYPE_STRING, description='ID организации'),
-                'phone_number': openapi.Schema(type=openapi.TYPE_STRING, description='Номер телефона'),
-                'email': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_EMAIL, description='Email адрес'),
-                'password': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_PASSWORD, description='Пароль'),
-                'password_confirm': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_PASSWORD, description='Подтверждение пароля'),
-                'groups': openapi.Schema(
-                    type=openapi.TYPE_ARRAY,
-                    items=openapi.Schema(type=openapi.TYPE_INTEGER),
-                    description='Список ID групп (ролей) пользователя. Пример: [1, 2, 3]'
-                ),
-            },
-            required=['first_name', 'last_name', 'id_organization', 'phone_number', 'email', 'password', 'password_confirm']
-        ),
+        request_body=RegisterSerializer,
         responses={
             201: openapi.Response(
                 'Успешная регистрация',
@@ -117,14 +105,7 @@ class LoginAPIView(APIView):
     @swagger_auto_schema(
         operation_description="Вход пользователя в систему по email или номеру телефона",
         tags=['Accounts'],
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'identifier': openapi.Schema(type=openapi.TYPE_STRING, description='Email или номер телефона'),
-                'password': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_PASSWORD, description='Пароль'),
-            },
-            required=['identifier', 'password']
-        ),
+        request_body=LoginSerializer,
         responses={
             200: openapi.Response(
                 'Успешный вход',
@@ -333,15 +314,7 @@ class ChangePasswordAPIView(APIView):
     @swagger_auto_schema(
         operation_description="Смена пароля текущего пользователя",
         tags=['Profile'],
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'old_password': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_PASSWORD, description='Текущий пароль'),
-                'new_password': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_PASSWORD, description='Новый пароль'),
-                'new_password_confirm': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_PASSWORD, description='Подтверждение нового пароля'),
-            },
-            required=['old_password', 'new_password', 'new_password_confirm']
-        ),
+        request_body=ChangePasswordSerializer,
         responses={
             200: openapi.Response('Успешная смена пароля'),
             400: openapi.Response('Ошибка валидации данных'),
@@ -386,13 +359,7 @@ class LogoutAPIView(APIView):
     @swagger_auto_schema(
         operation_description="Выход пользователя из системы",
         tags=['Accounts'],
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'refresh_token': openapi.Schema(type=openapi.TYPE_STRING, description='Refresh токен'),
-            },
-            required=['refresh_token']
-        ),
+        request_body=LogoutSerializer,
         responses={
             200: openapi.Response('Успешный выход'),
             400: openapi.Response('Ошибка при выходе'),
@@ -418,9 +385,6 @@ class LogoutAPIView(APIView):
                 'message': get_error_message('server_error'),
                 'errors': {'detail': str(e)}
             }, status=status.HTTP_400_BAD_REQUEST)
-
-
-class UserInfoAPIView(APIView):
     """
     Получение информации о текущем пользователе
     """
@@ -491,13 +455,7 @@ class ForgotPasswordAPIView(APIView):
     @swagger_auto_schema(
         operation_description="Запрос на восстановление пароля. На email будет отправлен токен для сброса пароля.",
         tags=['Accounts'],
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'email': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_EMAIL, description='Email адрес'),
-            },
-            required=['email']
-        ),
+        request_body=ForgotPasswordSerializer,
         responses={
             200: openapi.Response('Email с токеном отправлен'),
             400: openapi.Response('Ошибка валидации данных'),
@@ -595,15 +553,7 @@ class ResetPasswordAPIView(APIView):
     @swagger_auto_schema(
         operation_description="Сброс пароля с использованием токена, полученного по email",
         tags=['Accounts'],
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'token': openapi.Schema(type=openapi.TYPE_STRING, description='Токен для сброса пароля'),
-                'new_password': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_PASSWORD, description='Новый пароль'),
-                'new_password_confirm': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_PASSWORD, description='Подтверждение нового пароля'),
-            },
-            required=['token', 'new_password', 'new_password_confirm']
-        ),
+        request_body=ResetPasswordSerializer,
         responses={
             200: openapi.Response('Пароль успешно изменен'),
             400: openapi.Response('Ошибка валидации данных'),
@@ -666,124 +616,6 @@ class ResetPasswordAPIView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class SimpleChangePasswordAPIView(APIView):
-    """
-    Простая смена пароля (без старого пароля)
-    """
-    permission_classes = [IsAuthenticated]
-    
-    @swagger_auto_schema(
-        operation_description="Простая смена пароля для авторизованного пользователя (без подтверждения старого пароля)",
-        tags=['Profile'],
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'new_password': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_PASSWORD, description='Новый пароль'),
-                'new_password_confirm': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_PASSWORD, description='Подтверждение нового пароля'),
-            },
-            required=['new_password', 'new_password_confirm']
-        ),
-        responses={
-            200: openapi.Response('Пароль успешно изменен'),
-            400: openapi.Response('Ошибка валидации данных'),
-            401: openapi.Response('Требуется авторизация')
-        },
-        security=[{'Bearer': []}]
-    )
-    def post(self, request):
-        try:
-            serializer = SimpleChangePasswordSerializer(data=request.data)
-            
-            if serializer.is_valid():
-                user = request.user
-                user.set_password(serializer.validated_data['new_password'])
-                user.save()
-                
-                # Отправляем уведомление на email
-                subject = 'Пароль изменен - SafeCode CRM'
-                message = f"""
-Здравствуйте, {user.get_full_name()}!
-
-Ваш пароль для аккаунта в SafeCode CRM был успешно изменен.
-
-Если вы не меняли пароль, немедленно свяжитесь с нами.
-
-С уважением,
-Команда SafeCode CRM
-                """
-                
-                send_mail(
-                    subject,
-                    message,
-                    settings.DEFAULT_FROM_EMAIL,
-                    [user.email],
-                    fail_silently=False,
-                )
-                
-                return Response({
-                    'success': True,
-                    'message': 'Пароль успешно изменен'
-                }, status=status.HTTP_200_OK)
-            
-            return Response({
-                'success': False,
-                'message': get_error_message('validation_error'),
-                'errors': serializer.errors
-            }, status=status.HTTP_400_BAD_REQUEST)
-            
-        except Exception as e:
-            return Response({
-                'success': False,
-                'message': get_error_message('server_error'),
-                'errors': {'detail': str(e)}
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    """
-    Тестовый endpoint для отправки email
-    """
-    permission_classes = [AllowAny]
-    
-    @swagger_auto_schema(
-        operation_description="Тестовая отправка email",
-        tags=['Test'],
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'email': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_EMAIL, description='Email адрес'),
-            },
-            required=['email']
-        ),
-        responses={
-            200: openapi.Response('Email отправлен'),
-        }
-    )
-    def post(self, request):
-        try:
-            email = request.data.get('email')
-            
-            # Отправляем тестовый email
-            subject = 'Test Email - SafeCode CRM'
-            message = 'This is a test email from SafeCode CRM'
-            
-            send_mail(
-                subject,
-                message,
-                settings.DEFAULT_FROM_EMAIL,
-                [email],
-                fail_silently=False,
-            )
-            
-            return Response({
-                'success': True,
-                'message': f'Test email sent to {email}'
-            }, status=status.HTTP_200_OK)
-            
-        except Exception as e:
-            return Response({
-                'success': False,
-                'message': f'Email error: {str(e)}'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
 class GetRolesAPIView(APIView):
     """
     Получение списка всех ролей (групп)
@@ -835,3 +667,242 @@ class GetRolesAPIView(APIView):
                 'message': get_error_message('server_error'),
                 'errors': {'detail': str(e)}
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PurchasedServiceListCreateAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_description="Список покупок услуг текущего пользователя (админ видит все)",
+        tags=['Purchased Services'],
+        responses={200: 'OK'},
+        security=[{'Bearer': []}]
+    )
+    def get(self, request):
+        try:
+            user = request.user
+            if user.groups.filter(name='Администратор').exists():
+                qs = PurchasedService.objects.select_related('service', 'user').all()
+            else:
+                qs = PurchasedService.objects.select_related('service', 'user').filter(user=user)
+            serializer = PurchasedServiceReadSerializer(qs, many=True, context={'request': request})
+            return Response({'success': True, 'data': serializer.data}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'success': False, 'message': get_error_message('server_error'), 'errors': {'detail': str(e)}}, status=500)
+
+    @swagger_auto_schema(
+        operation_description="Покупка услуги (только роль Заказчик)",
+        tags=['Purchased Services'],
+        request_body=PurchasedServiceSerializer,
+        responses={201: 'Created', 400: 'Bad Request'},
+        security=[{'Bearer': []}]
+    )
+    def post(self, request):
+        try:
+            user = request.user
+            if not user.groups.filter(name='Заказчик').exists():
+                return Response({'success': False, 'message': 'Только роль Заказчик может покупать услуги.'}, status=403)
+
+            serializer = PurchasedServiceSerializer(data=request.data, context={'request': request})
+            if serializer.is_valid():
+                purchase = serializer.save()
+
+                # Notify admins about the purchase
+                admin_group = Group.objects.filter(name='Администратор').first()
+                if admin_group:
+                    admin_users = CustomUser.objects.filter(groups=admin_group)
+                    for admin in admin_users:
+                        Notification.objects.create(
+                            recipient=admin,
+                            actor=user,
+                            verb='service_purchased',
+                            message=f"Пользователь {user.get_full_name()} приобрел услугу '{purchase.service.title}'.",
+                            target=purchase,
+                            category='service'
+                        )
+                        try:
+                            send_mail(
+                                'Новая покупка услуги',
+                                f"Пользователь {user.get_full_name()} ({user.email}) приобрел услугу '{purchase.service.title}'.",
+                                settings.DEFAULT_FROM_EMAIL,
+                                [admin.email],
+                                fail_silently=True,
+                            )
+                        except Exception:
+                            pass
+
+                return Response({'success': True, 'data': PurchasedServiceSerializer(purchase).data}, status=201)
+            return Response({'success': False, 'message': get_error_message('validation_error'), 'errors': serializer.errors}, status=400)
+        except Exception as e:
+            return Response({'success': False, 'message': get_error_message('server_error'), 'errors': {'detail': str(e)}}, status=500)
+
+
+class PurchasedServiceDetailAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self, user, pk):
+        obj = PurchasedService.objects.select_related('service', 'user').filter(pk=pk).first()
+        if not obj:
+            return None, Response({'success': False, 'message': 'Объект не найден'}, status=404)
+        if user.groups.filter(name='Администратор').exists() or obj.user_id == user.id:
+            return obj, None
+        return None, Response({'success': False, 'message': 'Доступ запрещен'}, status=403)
+
+    @swagger_auto_schema(operation_description="Детали покупки услуги", tags=['Purchased Services'], security=[{'Bearer': []}])
+    def get(self, request, pk):
+        obj, err = self.get_object(request.user, pk)
+        if err:
+            return err
+        serializer = PurchasedServiceReadSerializer(obj, context={'request': request})
+        return Response({'success': True, 'data': serializer.data}, status=200)
+
+    @swagger_auto_schema(operation_description="Обновить покупку (только владелец или админ)", tags=['Purchased Services'], request_body=PurchasedServiceSerializer, security=[{'Bearer': []}])
+    def put(self, request, pk):
+        obj, err = self.get_object(request.user, pk)
+        if err:
+            return err
+        serializer = PurchasedServiceSerializer(obj, data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'success': True, 'data': serializer.data}, status=200)
+        return Response({'success': False, 'message': get_error_message('validation_error'), 'errors': serializer.errors}, status=400)
+
+    @swagger_auto_schema(operation_description="Удалить покупку (только владелец или админ)", tags=['Purchased Services'], security=[{'Bearer': []}])
+    def delete(self, request, pk):
+        obj, err = self.get_object(request.user, pk)
+        if err:
+            return err
+        obj.delete()
+        return Response({'success': True, 'message': 'Удалено'}, status=204)
+
+
+class CreateUserAPIView(APIView):
+    """
+    Создание нового пользователя (POST)
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @swagger_auto_schema(
+        operation_description="Создание нового пользователя в системе",
+        tags=['Admin'],
+        request_body=UserCreateSerializer,
+        responses={
+            201: openapi.Response(
+                'Успешное создание пользователя',
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                        'data': openapi.Schema(type=openapi.TYPE_OBJECT),
+                    }
+                )
+            ),
+            400: openapi.Response('Ошибка валидации данных'),
+            401: openapi.Response('Требуется авторизация')
+        },
+        security=[{'Bearer': []}]
+    )
+    def post(self, request):
+        try:
+            serializer = UserCreateSerializer(data=request.data)
+            
+            if serializer.is_valid():
+                user = serializer.save()
+                
+                return Response({
+                    'success': True,
+                    'message': 'Пользователь создан успешно!',
+                    'data': {
+                        'id': user.id,
+                        'first_name': user.first_name,
+                        'last_name': user.last_name,
+                        'email': user.email,
+                        'phone_number': user.phone_number,
+                        'created_at': user.created_at,
+                        'last_login': user.last_login,
+                        'groups': [{'id': g.id, 'name': g.name} for g in user.groups.all()],
+                    }
+                }, status=status.HTTP_201_CREATED)
+            
+            return Response({
+                'success': False,
+                'message': get_error_message('validation_error'),
+                'errors': serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': get_error_message('server_error'),
+                'errors': {'detail': str(e)}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ListUsersAPIView(APIView):
+    """
+    Получение списка всех пользователей (исключая суперпользователей)
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @swagger_auto_schema(
+        operation_description="Получение списка всех пользователей (исключая суперпользователей)",
+        tags=['Admin'],
+        responses={
+            200: openapi.Response(
+                'Успешное получение списка пользователей',
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                        'data': openapi.Schema(
+                            type=openapi.TYPE_ARRAY,
+                            items=openapi.Schema(type=openapi.TYPE_OBJECT)
+                        ),
+                    }
+                )
+            ),
+            401: openapi.Response('Требуется авторизация')
+        },
+        security=[{'Bearer': []}]
+    )
+    def get(self, request):
+        try:
+            # Получаем всех пользователей, исключая суперпользователей
+            users = CustomUser.objects.filter(is_superuser=False).exclude(groups__name__in=['Администратор']).order_by('-created_at')
+            serializer = UserListSerializer(users, many=True)
+            
+            return Response({
+                'success': True,
+                'message': 'Список пользователей получен успешно',
+                'data': serializer.data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': get_error_message('server_error'),
+                'errors': {'detail': str(e)}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+
+class GroupListAPIView(APIView):
+    """
+    Получение списка всех групп (ролей)
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @swagger_auto_schema(
+        operation_description="Получение списка всех групп (ролей)",
+        tags=['Admin'],
+        responses={200: 'OK'},
+        security=[{'Bearer': []}]
+    )
+    def get(self, request):
+        try:
+            groups = Group.objects.all()
+            serializer = GroupSerializer(groups, many=True)
+            return Response({'success': True, 'data': serializer.data}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'success': False, 'message': get_error_message('server_error'), 'errors': {'detail': str(e)}}, status=500)

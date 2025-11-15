@@ -22,7 +22,7 @@ class CustomOpenAPISchemaGenerator(generators.OpenAPISchemaGenerator):
                 'type': 'apiKey',
                 'name': 'Authorization',
                 'in': 'header',
-                'description': 'JWT Bearer token. Token olish uchun login endpoint\'dan foydalaning: /api/v1/accounts/login/'
+                'description': 'JWT Bearer token. Для получения токена используйте endpoint логина: /api/v1/accounts/login/'
             },
         }
 
@@ -34,16 +34,16 @@ schema_view = get_schema_view(
         description="""
         SafeCode CRM APIs - Система управления для SafeCode CRM
         
-        ### 📌 Аутентификация (Login qilish)
+        ### 📌 Аутентификация (Вход в систему)
         
-        **1-usul: Bearer token orqali**
-        1. `POST /api/v1/accounts/login/` endpointiga email va parol yuboring
-        2. Olingan `access` tokenni nusxalang
-        3. "Authorize" tugmasini bosing
-        4. Token o'rniga quyidagi formatda kiriting: `Bearer YOUR_TOKEN_HERE`
-        5. "Authorize" tugmasini bosing va barcha API'larni ishlatish mumkin! ✅
+        **Способ 1: Через Bearer token**
+        1. Отправьте email и пароль на endpoint `POST /api/v1/accounts/login/`
+        2. Скопируйте полученный `access` токен
+        3. Нажмите кнопку "Authorize"
+        4. Введите токен в следующем формате: `Bearer YOUR_TOKEN_HERE`
+        5. Нажмите кнопку "Authorize" и можете использовать все API! ✅
         
-        **Eslatma:** Token 1 soat davomida amal qiladi. Muddat o'tgach qayta login qiling.
+        **Примечание:** Токен действителен в течение 1 часа. После истечения срока выполните повторный вход.
         """,
         terms_of_service="https://www.google.com/policies/terms/",
         contact=openapi.Contact(email="contact@snippets.local"),
@@ -55,6 +55,9 @@ schema_view = get_schema_view(
     patterns=[
         path('api/v1/accounts/', include('apps.v1.accounts.urls')),
         path('api/v1/website/', include('apps.v1.website.urls')),
+        path('api/v1/notification/', include('apps.v1.notification.urls')),
+        path('api/v1/products/', include('apps.v1.products.urls')),
+        path('api/v1/user_objects/', include('apps.v1.user_objects.urls')),
     ],
     generator_class=CustomOpenAPISchemaGenerator,
 )
@@ -77,6 +80,8 @@ urlpatterns += [
 urlpatterns += [
     path('api/v1/accounts/', include('apps.v1.accounts.urls')),
     path('api/v1/website/', include('apps.v1.website.urls')),
+    path('api/v1/products/', include('apps.v1.products.urls')),
+    path('api/v1/user_objects/', include('apps.v1.user_objects.urls')),
 ]
 
 urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

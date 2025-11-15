@@ -17,6 +17,15 @@ urlpatterns = [
     # Профиль пользователя
     path('profile/', views.ProfileAPIView.as_view(), name='profile'),
     path('profile/change-password/', views.ChangePasswordAPIView.as_view(), name='change_password'),
-    path('profile/simple-change-password/', views.SimpleChangePasswordAPIView.as_view(), name='simple_change_password'),
-    path('user-info/', views.UserInfoAPIView.as_view(), name='user_info'),
+    
+    # Purchased services
+    path('purchased-services/', views.PurchasedServiceListCreateAPIView.as_view(), name='purchased_service_list_create'),
+    path('purchased-services/<int:pk>/', views.PurchasedServiceDetailAPIView.as_view(), name='purchased_service_detail'),
+    
+    # User management
+    path('users/', views.ListUsersAPIView.as_view(), name='list_users'),
+    path('users/create/', views.CreateUserAPIView.as_view(), name='create_user'),
+    
+    # Group management
+    path('groups/', views.GroupListAPIView.as_view(), name='group_list'),
 ]

@@ -8,8 +8,12 @@ from config.libraries.cache import CACHES
 from config.libraries.swagger import SWAGGER_SETTINGS, SWAGGER_UI_OAUTH2_CONFIG
 
 import os
+import warnings
 from datetime import timedelta
 from pathlib import Path
+
+# Suppress pkg_resources deprecation warnings
+warnings.filterwarnings('ignore', message='.*pkg_resources is deprecated.*', category=UserWarning)
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -39,6 +43,9 @@ ALLOWED_HOSTS = ["*"]
 LOCAL_APPS = [
     'apps.v1.accounts',
     'apps.v1.website',
+    'apps.v1.notification',
+    'apps.v1.products',
+    'apps.v1.user_objects'
 ]
 
 THIRD_PARTY_APPS = [
@@ -61,6 +68,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     *THIRD_PARTY_APPS,
+    'django_celery_beat',
 ]
 
 LOCAL_MIDDLEWARE = [
@@ -168,3 +176,17 @@ AUTHENTICATION_BACKENDS = (
 AUTH_USER_MODEL = 'accounts.CustomUser'
 
 SITE_ID = 1
+
+# Celery
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+CELERY_TIMEZONE = TIME_ZONE
+
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    'notify-expiring-services-daily-08-00': {
+        'task': 'apps.v1.notification.views.notify_expiring_services',
+        'schedule': crontab(minute=0, hour=8),
+    },
+}

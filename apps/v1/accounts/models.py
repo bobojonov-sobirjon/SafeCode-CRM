@@ -1,8 +1,12 @@
 from turtle import position
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.conf import settings
+from django.utils import timezone
+from datetime import timedelta
 from decimal import Decimal
 import secrets
+from apps.v1.website.models import Services
 
 class CustomUser(AbstractUser):
     """
@@ -136,3 +140,44 @@ class CustomUser(AbstractUser):
         Return the short name for the user.
         """
         return self.first_name if self.first_name else self.email
+
+
+class PurchasedService(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='purchased_services',
+        verbose_name='Пользователь'
+    )
+    service = models.ForeignKey(
+        Services,
+        on_delete=models.CASCADE,
+        related_name='purchases',
+        verbose_name='Услуга'
+    )
+    start_date = models.DateTimeField(
+        verbose_name='Дата начала',
+        default=timezone.now
+    )
+    finished_date = models.DateTimeField(
+        verbose_name='Дата окончания',
+        blank=True,
+        null=True
+    )
+    is_active = models.BooleanField(default=True, verbose_name='Активна')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Создано')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='Обновлено')
+
+    class Meta:
+        verbose_name = 'Покупка услуги'
+        verbose_name_plural = 'Покупки услуг'
+        ordering = ['-created_at']
+        unique_together = ('user', 'service', 'start_date')
+
+    def save(self, *args, **kwargs):
+        if not self.finished_date and self.start_date:
+            self.finished_date = self.start_date + timedelta(days=30)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.service.title}"
