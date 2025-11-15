@@ -146,18 +146,12 @@ class UserObjectListCreateAPIView(APIView):
 
 class UserObjectDocumentCreateAPIView(APIView):
     """
-    Создание документов для объекта пользователя
+    Создание документов для объекта пользователя.
+    Файлы загружаются через form-data. Используйте multipart/form-data для загрузки файлов.
     """
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
     
-    @swagger_auto_schema(
-        operation_description="Создание документов для объекта пользователя. Файлы загружаются через form-data. Используйте multipart/form-data для загрузки файлов.",
-        tags=['User Objects'],
-        request_body=UserObjectDocumentCreateSerializer,
-        responses={201: 'Created', 400: 'Bad Request', 401: 'Unauthorized'},
-        security=[{'Bearer': []}]
-    )
     def post(self, request):
         try:
             # Передаем request.data и request.FILES в контекст для обработки multipart/form-data
