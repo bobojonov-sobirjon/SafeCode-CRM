@@ -152,19 +152,30 @@ class UserObjectDocumentCreateAPIView(APIView):
     @swagger_auto_schema(
         operation_description="Создание документов для объекта пользователя. Файлы загружаются через form-data.",
         tags=['User Objects'],
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'user_object_id': openapi.Schema(type=openapi.TYPE_INTEGER, description='ID объекта пользователя'),
-                'comment': openapi.Schema(type=openapi.TYPE_STRING, description='Комментарий к документам'),
-                'document_list': openapi.Schema(
-                    type=openapi.TYPE_ARRAY,
-                    items=openapi.Schema(type=openapi.TYPE_FILE),
-                    description='Список документов (файлы)'
-                ),
-            },
-            required=['user_object_id', 'document_list']
-        ),
+        manual_parameters=[
+            openapi.Parameter(
+                'user_object_id',
+                openapi.IN_FORM,
+                description='ID объекта пользователя',
+                type=openapi.TYPE_INTEGER,
+                required=True
+            ),
+            openapi.Parameter(
+                'comment',
+                openapi.IN_FORM,
+                description='Комментарий к документам',
+                type=openapi.TYPE_STRING,
+                required=False
+            ),
+            openapi.Parameter(
+                'document_list',
+                openapi.IN_FORM,
+                description='Список документов (файлы). Можно загрузить несколько файлов.',
+                type=openapi.TYPE_FILE,
+                required=True
+            ),
+        ],
+        consumes=['multipart/form-data'],
         responses={201: 'Created', 400: 'Bad Request', 401: 'Unauthorized'},
         security=[{'Bearer': []}]
     )
