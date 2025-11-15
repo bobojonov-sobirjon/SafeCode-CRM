@@ -203,7 +203,7 @@ class ProductListCreateAPIView(APIView):
                 'depth': openapi.Schema(type=openapi.TYPE_INTEGER, description='Глубина'),
             }
         ),
-        consumes=['multipart/form-data', 'application/json'],
+        consumes=['application/json'],
         responses={
             201: openapi.Response(
                 'Успешное создание продукта',
@@ -305,47 +305,6 @@ class ProductDetailAPIView(APIView):
                 'errors': {'detail': str(e)}
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-    @swagger_auto_schema(
-        operation_description="Обновление продукта. Используйте multipart/form-data для загрузки изображений. Поле images_list может содержать несколько файлов. При отправке новых изображений старые будут удалены.",
-        tags=['Products'],
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'name': openapi.Schema(type=openapi.TYPE_STRING, description='Название продукта'),
-                'description': openapi.Schema(type=openapi.TYPE_STRING, description='Описание продукта'),
-                'price': openapi.Schema(type=openapi.TYPE_NUMBER, description='Цена продукта'),
-                'stock': openapi.Schema(type=openapi.TYPE_INTEGER, description='Количество на складе'),
-                'article': openapi.Schema(type=openapi.TYPE_STRING, description='Артикул'),
-                'is_active': openapi.Schema(type=openapi.TYPE_BOOLEAN, description='Активен'),
-                'images_list': openapi.Schema(
-                    type=openapi.TYPE_ARRAY,
-                    items=openapi.Schema(type=openapi.TYPE_FILE),
-                    description='Список изображений (файлы). При отправке новых изображений старые будут удалены.'
-                ),
-                'width': openapi.Schema(type=openapi.TYPE_INTEGER, description='Ширина'),
-                'height': openapi.Schema(type=openapi.TYPE_INTEGER, description='Высота'),
-                'depth': openapi.Schema(type=openapi.TYPE_INTEGER, description='Глубина'),
-            }
-        ),
-        consumes=['multipart/form-data', 'application/json'],
-        responses={
-            200: openapi.Response(
-                'Успешное обновление продукта',
-                schema=openapi.Schema(
-                    type=openapi.TYPE_OBJECT,
-                    properties={
-                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
-                        'message': openapi.Schema(type=openapi.TYPE_STRING),
-                        'data': openapi.Schema(type=openapi.TYPE_OBJECT),
-                    }
-                )
-            ),
-            400: openapi.Response('Ошибка валидации данных'),
-            404: openapi.Response('Продукт не найден'),
-            401: openapi.Response('Требуется авторизация')
-        },
-        security=[{'Bearer': []}]
-    )
     def put(self, request, pk):
         try:
             product = Product.objects.filter(pk=pk, is_deleted=False).first()
