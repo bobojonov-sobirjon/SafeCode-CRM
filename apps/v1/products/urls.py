@@ -4,6 +4,9 @@ from . import views
 app_name = 'products'
 
 urlpatterns = [
+    # Категории
+    path('category/all/', views.CategoryListAPIView.as_view(), name='category_all'),
+    
     # CRUD операции для продуктов
     path('', views.ProductListCreateAPIView.as_view(), name='product_list_create'),
     path('<int:pk>/', views.ProductDetailAPIView.as_view(), name='product_detail'),
