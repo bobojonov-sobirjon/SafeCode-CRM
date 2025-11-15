@@ -305,6 +305,13 @@ class ProductDetailAPIView(APIView):
                 'errors': {'detail': str(e)}
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
+    @swagger_auto_schema(
+        operation_description="Обновление продукта (PUT - полное обновление)",
+        tags=['Products'],
+        request_body=ProductCreateUpdateSerializer,
+        responses={200: 'OK', 400: 'Bad Request', 404: 'Not Found', 401: 'Unauthorized'},
+        security=[{'Bearer': []}]
+    )
     def put(self, request, pk):
         try:
             product = Product.objects.filter(pk=pk, is_deleted=False).first()
