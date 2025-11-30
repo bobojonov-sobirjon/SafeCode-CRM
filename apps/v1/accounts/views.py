@@ -2,6 +2,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework_simplejwt.tokens import RefreshToken
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
@@ -13,13 +14,15 @@ from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
 import secrets
-from .models import CustomUser, PurchasedService
+from .models import CustomUser, PurchasedService, Storage, StorageFile
 from .serializers import (
     PurchasedServiceReadSerializer,
     RegisterSerializer, LoginSerializer, ProfileSerializer, 
     ChangePasswordSerializer, ForgotPasswordSerializer, ResetPasswordSerializer,
     SimpleChangePasswordSerializer, PurchasedServiceSerializer,
-    UserCreateSerializer, UserListSerializer, GroupSerializer, LogoutSerializer
+    UserCreateSerializer, UserListSerializer, GroupSerializer, LogoutSerializer,
+    StorageSerializer, StorageCreateSerializer, StorageUpdateSerializer,
+    StorageFileSerializer, StorageFileCreateSerializer
 )
 from .error_handlers import get_error_message
 from django.contrib.auth.models import Group

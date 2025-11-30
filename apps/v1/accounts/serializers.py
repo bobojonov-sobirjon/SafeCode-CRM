@@ -3,7 +3,7 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
-from .models import CustomUser, PurchasedService
+from .models import CustomUser, PurchasedService, Storage, StorageFile
 from apps.v1.website.models import Services
 from django.utils import timezone
 from datetime import timedelta
@@ -755,3 +755,99 @@ class GroupSerializer(serializers.ModelSerializer):
         model = Group
         fields = ['id', 'name']
         read_only_fields = ['id']
+
+
+class StorageFileSerializer(serializers.ModelSerializer):
+    """
+    Сериализатор для файлов хранилища
+    """
+    class Meta:
+        model = StorageFile
+        fields = ['id', 'file', 'name', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class StorageFileCreateSerializer(serializers.ModelSerializer):
+    """
+    Сериализатор для создания файлов хранилища
+    """
+    class Meta:
+        model = StorageFile
+        fields = ['file', 'name']
+        extra_kwargs = {
+            'name': {'required': False, 'allow_blank': True, 'allow_null': True}
+        }
+
+
+class StorageSerializer(serializers.ModelSerializer):
+    """
+    Сериализатор для чтения хранилища
+    """
+    files = StorageFileSerializer(many=True, read_only=True)
+    object = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Storage
+        fields = ['id', 'object', 'name', 'date', 'files', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'files']
+    
+    def get_object(self, obj):
+        """
+        Получение информации об объекте
+        """
+        if obj.object:
+            return {
+                'id': obj.object.id,
+                'name': obj.object.name,
+            }
+        return None
+
+
+class StorageCreateSerializer(serializers.ModelSerializer):
+    """
+    Сериализатор для создания хранилища
+    """
+    object_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        write_only=True,
+        help_text='ID объекта (необязательно)'
+    )
+    
+    class Meta:
+        model = Storage
+        fields = ['object_id', 'name', 'date']
+        extra_kwargs = {
+            'name': {'required': True},
+            'date': {'required': True}
+        }
+        
+    def create(self, validated_data):
+        """
+        Создание хранилища
+        """
+        object_id = validated_data.pop('object_id', None)
+        user = self.context['request'].user
+        validated_data['user'] = user
+        
+        # Устанавливаем object если object_id передан
+        if object_id:
+            from apps.v1.user_objects.models import UserObject
+            try:
+                validated_data['object'] = UserObject.objects.get(id=object_id)
+            except UserObject.DoesNotExist:
+                validated_data['object'] = None
+        
+        return super().create(validated_data)
+
+
+class StorageUpdateSerializer(serializers.ModelSerializer):
+    """
+    Сериализатор для обновления хранилища
+    """
+    class Meta:
+        model = Storage
+        fields = ['object', 'name', 'date']
+        extra_kwargs = {
+            'object': {'required': False, 'allow_null': True}
+        }

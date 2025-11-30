@@ -155,7 +155,51 @@ class UserObjectDocumentCreateAPIView(APIView):
     @swagger_auto_schema(
         operation_description="Создание документов для объекта пользователя. Файлы загружаются через form-data. Используйте multipart/form-data для загрузки файлов.",
         tags=['User Objects'],
-        responses={201: 'Created', 400: 'Bad Request', 401: 'Unauthorized'},
+        manual_parameters=[
+            openapi.Parameter(
+                'user_object_id',
+                openapi.IN_FORM,
+                description='ID объекта пользователя',
+                type=openapi.TYPE_INTEGER,
+                required=True
+            ),
+            openapi.Parameter(
+                'comment',
+                openapi.IN_FORM,
+                description='Комментарий (необязательно)',
+                type=openapi.TYPE_STRING,
+                required=False
+            ),
+            openapi.Parameter(
+                'document_list',
+                openapi.IN_FORM,
+                description='Файлы для загрузки (можно загрузить несколько файлов, используйте document_list[0], document_list[1] и т.д.)',
+                type=openapi.TYPE_FILE,
+                required=True
+            ),
+        ],
+        consumes=['multipart/form-data'],
+        responses={
+            201: openapi.Response(
+                'Успешное создание документов',
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                        'data': openapi.Schema(
+                            type=openapi.TYPE_OBJECT,
+                            properties={
+                                'document_id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                'items_count': openapi.Schema(type=openapi.TYPE_INTEGER),
+                            }
+                        ),
+                    }
+                )
+            ),
+            400: openapi.Response('Ошибка валидации данных'),
+            401: openapi.Response('Требуется авторизация')
+        },
         security=[{'Bearer': []}]
     )
     def post(self, request):
@@ -667,6 +711,161 @@ class WorkersListAPIView(APIView):
                 'success': True,
                 'message': 'Список работников получен успешно',
                     'data': workers_by_role
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': get_error_message('server_error'),
+                'errors': {'detail': str(e)}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class UserObjectStatusUpdateAPIView(APIView):
+    """
+    Обновление статуса объекта пользователя (закрытие проекта)
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @swagger_auto_schema(
+        operation_description="Обновление статуса объекта пользователя. Доступно только для администраторов. Статусы: completed, on_hold, cancelled",
+        tags=['User Objects'],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'object_id': openapi.Schema(
+                    type=openapi.TYPE_INTEGER,
+                    description='ID объекта пользователя'
+                ),
+                'status': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    enum=['completed', 'on_hold', 'cancelled'],
+                    description='Новый статус объекта'
+                ),
+            },
+            required=['object_id', 'status']
+        ),
+        responses={
+            200: openapi.Response('Успешное обновление статуса'),
+            400: openapi.Response('Ошибка валидации данных'),
+            403: openapi.Response('Доступ запрещен'),
+            404: openapi.Response('Объект не найден'),
+            401: openapi.Response('Требуется авторизация')
+        },
+        security=[{'Bearer': []}]
+    )
+    def post(self, request):
+        try:
+            user = request.user
+            
+            # Проверяем, является ли пользователь администратором
+            if not user.groups.filter(name='Администратор').exists():
+                return Response({
+                    'success': False,
+                    'message': 'Только администраторы могут изменять статус объекта'
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            object_id = request.data.get('object_id')
+            new_status = request.data.get('status')
+            
+            if not object_id:
+                return Response({
+                    'success': False,
+                    'message': 'object_id обязателен'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if not new_status:
+                return Response({
+                    'success': False,
+                    'message': 'status обязателен'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Проверяем валидность статуса
+            valid_statuses = [
+                UserObject.Status.COMPLETED,
+                UserObject.Status.ON_HOLD,
+                UserObject.Status.CANCELLED
+            ]
+            
+            if new_status not in valid_statuses:
+                return Response({
+                    'success': False,
+                    'message': f'Неверный статус. Допустимые значения: {", ".join(valid_statuses)}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Получаем объект
+            try:
+                user_object = UserObject.objects.get(id=object_id, is_deleted=False)
+            except UserObject.DoesNotExist:
+                return Response({
+                    'success': False,
+                    'message': 'Объект не найден'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Обновляем статус
+            old_status = user_object.status
+            user_object.status = new_status
+            user_object.save()
+            
+            # Отправляем уведомление создателю объекта
+            from channels.layers import get_channel_layer
+            from asgiref.sync import async_to_sync
+            from apps.v1.notification.models import Notification
+            
+            channel_layer = get_channel_layer()
+            
+            # Статусы на русском
+            status_messages = {
+                UserObject.Status.COMPLETED: 'Завершенный',
+                UserObject.Status.ON_HOLD: 'На паузе',
+                UserObject.Status.CANCELLED: 'Отмененный'
+            }
+            
+            status_text = status_messages.get(new_status, new_status)
+            message = f"Администратор изменил статус объекта '{user_object.name}' на {status_text}"
+            
+            # Создаем уведомление
+            notification = Notification.objects.create(
+                recipient=user_object.user,
+                actor=user,
+                verb="object_status_changed",
+                message=message,
+                user_object=user_object,
+                category='user_object'
+            )
+            
+            # Отправляем через WebSocket
+            if channel_layer:
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{user_object.user.id}",
+                    {
+                        "type": "notification_message",
+                        "notification": {
+                            "id": notification.id,
+                            "message": message,
+                            "verb": "object_status_changed",
+                            "actor": {
+                                "id": user.id,
+                                "first_name": user.first_name,
+                                "last_name": user.last_name,
+                            },
+                            "user_object": {
+                                "id": user_object.id,
+                                "name": user_object.name,
+                            },
+                            "created_at": notification.created_at.isoformat(),
+                            "is_read": notification.is_read,
+                        }
+                    }
+                )
+            
+            # Возвращаем обновленный объект
+            serializer = UserObjectSerializer(user_object, context={'request': request})
+            
+            return Response({
+                'success': True,
+                'message': f'Статус объекта успешно изменен на {status_text}',
+                'data': serializer.data
             }, status=status.HTTP_200_OK)
             
         except Exception as e:

@@ -113,6 +113,10 @@ class UserObjectWorkersAddSerializer(serializers.Serializer):
         """
         Добавление работников к объекту
         """
+        from apps.v1.notification.models import Notification
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+        
         user_object_id = validated_data['user_objects_id']
         worker_ids = validated_data['worker_list']
         
@@ -134,6 +138,59 @@ class UserObjectWorkersAddSerializer(serializers.Serializer):
             )
             if created:
                 created_workers.append(worker)
+        
+        # Отправляем одно уведомление создателю объекта со всеми ролями
+        if created_workers:
+            workers = UserObjectWorkers.objects.filter(user_object=user_object)
+            worker_roles = set()
+            for w in workers:
+                worker_groups = w.user.groups.all()
+                for group in worker_groups:
+                    if group.name not in ['Администратор', 'Заказчик']:
+                        worker_roles.add(group.name)
+            
+            if worker_roles:
+                roles_str = ", ".join(worker_roles)
+                message_to_creator = f"Ваш объект '{user_object.name}' отправлен для проверки ролям: {roles_str}"
+                
+                # Создаем уведомление
+                notification = Notification.objects.create(
+                    recipient=user_object.user,
+                    actor=user_object.user,
+                    verb="object_sent_for_review",
+                    message=message_to_creator,
+                    user_object=user_object,
+                    category='user_object'
+                )
+                
+                # Отправляем через WebSocket
+                try:
+                    channel_layer = get_channel_layer()
+                    if channel_layer:
+                        async_to_sync(channel_layer.group_send)(
+                            f"user_{user_object.user.id}",
+                            {
+                                "type": "notification_message",
+                                "notification": {
+                                    "id": notification.id,
+                                    "message": message_to_creator,
+                                    "verb": "object_sent_for_review",
+                                    "actor": {
+                                        "id": user_object.user.id,
+                                        "first_name": user_object.user.first_name,
+                                        "last_name": user_object.user.last_name,
+                                    },
+                                    "user_object": {
+                                        "id": user_object.id,
+                                        "name": user_object.name,
+                                    },
+                                    "created_at": notification.created_at.isoformat(),
+                                    "is_read": notification.is_read,
+                                }
+                            }
+                        )
+                except Exception:
+                    pass
         
         return {
             'user_object': user_object,
@@ -182,25 +239,29 @@ class UserObjectDocumentCreateSerializer(serializers.Serializer):
             'comment': data.get('comment', ''),
         }
         
-        # Обрабатываем файлы
+        # Обрабатываем файлы - для multipart/form-data файлы всегда в request.FILES
         files = self.context.get('files', {})
         document_list = []
         
-        # Получаем все файлы
+        # Получаем все файлы из request.FILES
         # В form-data файлы могут приходить как:
-        # - document_list[0], document_list[1], ...
+        # - document_list[0], document_list[1], ... (несколько файлов)
         # - document_list (один файл)
-        # - document_list[] (массив)
-        for key in files.keys():
-            if 'document_list' in key.lower():
-                document_list.append(files[key])
+        # - document_list[] (массив, один файл)
         
-        # Также проверяем, может быть передан список через data
-        if 'document_list' in data:
-            if isinstance(data.get('document_list'), list):
-                document_list.extend(data.get('document_list'))
-            elif data.get('document_list'):
-                document_list.append(data.get('document_list'))
+        # Сначала проверяем, есть ли файлы с ключами document_list[0], document_list[1] и т.д.
+        document_keys = [key for key in files.keys() if key.startswith('document_list[')]
+        if document_keys:
+            # Если есть файлы с индексами, сортируем их и добавляем
+            document_keys.sort(key=lambda x: int(x.split('[')[1].split(']')[0]) if '[' in x and ']' in x else 0)
+            for key in document_keys:
+                document_list.append(files[key])
+        else:
+            # Если нет файлов с индексами, ищем document_list или document_list[]
+            for key in files.keys():
+                if key.lower() == 'document_list' or key.lower() == 'document_list[]':
+                    document_list.append(files[key])
+                    break  # Один файл, выходим из цикла
         
         if not document_list:
             raise serializers.ValidationError({'document_list': 'Необходимо загрузить хотя бы один документ.'})

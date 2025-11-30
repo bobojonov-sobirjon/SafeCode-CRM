@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.sites.models import Site
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
-from .models import CustomUser
+from .models import CustomUser, Storage, StorageFile
 
 # Unregister Token Blacklist models
 try:
@@ -51,6 +51,30 @@ class CustomUserAdmin(UserAdmin):
     
     readonly_fields = ('created_at', 'updated_at', 'date_joined', 'last_login', 'reset_token', 'reset_token_expires')
     
+
+@admin.register(Storage)
+class StorageAdmin(admin.ModelAdmin):
+    """
+    Админка для хранилищ
+    """
+    list_display = ('name', 'user', 'object', 'date', 'created_at')
+    list_filter = ('date', 'created_at', 'user')
+    search_fields = ('name', 'user__email', 'user__first_name', 'user__last_name')
+    ordering = ('-created_at',)
+    raw_id_fields = ('user', 'object')
+
+
+@admin.register(StorageFile)
+class StorageFileAdmin(admin.ModelAdmin):
+    """
+    Админка для файлов хранилища
+    """
+    list_display = ('name', 'storage', 'file', 'created_at')
+    list_filter = ('created_at', 'storage')
+    search_fields = ('name', 'storage__name')
+    ordering = ('-created_at',)
+    raw_id_fields = ('storage',)
+
 
 admin.site.unregister(Site)
 

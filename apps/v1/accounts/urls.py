@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import storage_views
 
 app_name = 'accounts'
 
@@ -28,4 +29,10 @@ urlpatterns = [
     
     # Group management
     path('groups/', views.GroupListAPIView.as_view(), name='group_list'),
+    
+    # Storage management
+    path('storage/', storage_views.StorageListCreateAPIView.as_view(), name='storage_list_create'),
+    path('storage/<int:pk>/', storage_views.StorageDetailAPIView.as_view(), name='storage_detail'),
+    path('storage/<int:storage_id>/files/', storage_views.StorageFileListCreateAPIView.as_view(), name='storage_file_list_create'),
+    path('storage/<int:storage_id>/files/<int:file_id>/', storage_views.StorageFileDetailAPIView.as_view(), name='storage_file_detail'),
 ]

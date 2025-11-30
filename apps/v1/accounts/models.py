@@ -180,3 +180,88 @@ class PurchasedService(models.Model):
 
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.service.title}"
+
+
+class Storage(models.Model):
+    """
+    Модель хранилища
+    """
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='storages',
+        verbose_name='Пользователь'
+    )
+    object = models.ForeignKey(
+        'user_objects.UserObject',
+        on_delete=models.CASCADE,
+        related_name='storages',
+        verbose_name='Объект',
+        null=True,
+        blank=True
+    )
+    name = models.CharField(
+        max_length=255,
+        verbose_name='Название',
+        help_text='Название хранилища'
+    )
+    date = models.DateField(
+        verbose_name='Дата',
+        help_text='Дата хранилища'
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Дата создания'
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name='Дата обновления'
+    )
+
+    class Meta:
+        verbose_name = 'Хранилище'
+        verbose_name_plural = 'Хранилища'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name} - {self.user.get_full_name()}"
+
+
+class StorageFile(models.Model):
+    """
+    Модель файлов хранилища
+    """
+    storage = models.ForeignKey(
+        Storage,
+        on_delete=models.CASCADE,
+        related_name='files',
+        verbose_name='Хранилище'
+    )
+    file = models.FileField(
+        upload_to='storage/files/',
+        verbose_name='Файл',
+        help_text='Файл для хранилища'
+    )
+    name = models.CharField(
+        max_length=255,
+        verbose_name='Название файла',
+        blank=True,
+        null=True,
+        help_text='Название файла (необязательно)'
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Дата создания'
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name='Дата обновления'
+    )
+
+    class Meta:
+        verbose_name = 'Файл хранилища'
+        verbose_name_plural = 'Файлы хранилища'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name or self.file.name} - {self.storage.name}"

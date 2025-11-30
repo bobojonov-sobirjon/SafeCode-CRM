@@ -28,6 +28,16 @@ class Notification(models.Model):
     target_object_id = models.PositiveIntegerField(null=True, blank=True)
     target = GenericForeignKey("target_content_type", "target_object_id")
 
+    # Связь с UserObject для уведомлений об объектах
+    user_object = models.ForeignKey(
+        'user_objects.UserObject',
+        on_delete=models.CASCADE,
+        related_name='notifications',
+        null=True,
+        blank=True,
+        verbose_name="Объект пользователя"
+    )
+
     category = models.CharField(max_length=100, blank=True, null=True, verbose_name="Категория")
     is_read = models.BooleanField(default=False, verbose_name="Прочитано")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")

@@ -45,7 +45,9 @@ LOCAL_APPS = [
     'apps.v1.website',
     'apps.v1.notification',
     'apps.v1.products',
-    'apps.v1.user_objects'
+    'apps.v1.user_objects',
+    'apps.v1.documents',
+    'apps.v1.orders',
 ]
 
 THIRD_PARTY_APPS = [
@@ -60,6 +62,8 @@ THIRD_PARTY_APPS = [
 ]
 
 INSTALLED_APPS = [
+    'daphne',
+    'channels',
     'django.contrib.sites',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -104,6 +108,8 @@ TEMPLATES = [
         },
     },
 ]
+
+ASGI_APPLICATION = 'config.asgi.application'
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
@@ -201,4 +207,17 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.v1.notification.views.notify_expiring_services',
         'schedule': crontab(minute=0, hour=8),
     },
+}
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer'
+    },
+}
+
+ASGI_APPLICATION = 'config.asgi.application'
+
+SWAGGER_SETTINGS = {
+    'USE_SESSION_AUTH': False,
+    'TEMPLATE': 'drf_yasg/swagger-ui.html',
 }

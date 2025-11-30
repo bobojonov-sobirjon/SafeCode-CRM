@@ -14,4 +14,7 @@ urlpatterns = [
     path('workers/add/', views.UserObjectWorkersAddAPIView.as_view(), name='user_object_workers_add'),
     path('workers/', views.WorkersListAPIView.as_view(), name='workers_list'),
     path('documents/create/', views.UserObjectDocumentCreateAPIView.as_view(), name='user_object_document_create'),
+    
+    # Обновление статуса объекта
+    path('status/update/', views.UserObjectStatusUpdateAPIView.as_view(), name='user_object_status_update'),
 ]
