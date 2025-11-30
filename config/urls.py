@@ -82,8 +82,10 @@ urlpatterns += [
 urlpatterns += [
     path('api/v1/accounts/', include('apps.v1.accounts.urls')),
     path('api/v1/website/', include('apps.v1.website.urls')),
+    path('api/v1/notification/', include('apps.v1.notification.urls')),
     path('api/v1/products/', include('apps.v1.products.urls')),
     path('api/v1/user_objects/', include('apps.v1.user_objects.urls')),
+    path('api/v1/documents/', include('apps.v1.documents.urls')),
     path('api/v1/orders/', include('apps.v1.orders.urls')),
 ]
 

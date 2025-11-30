@@ -47,13 +47,18 @@ def notify_expiring_services():
 
 class NotificationListAPIView(APIView):
     """
-    Получение списка непрочитанных уведомлений текущего пользователя
+    Получение списка уведомлений текущего пользователя
     """
     permission_classes = [IsAuthenticated]
     
     @swagger_auto_schema(
-        operation_description="Получение списка непрочитанных уведомлений текущего пользователя (is_read=False)",
+        operation_description="Получение списка уведомлений текущего пользователя. Можно фильтровать по is_read параметру.",
         tags=['Notifications'],
+        manual_parameters=[
+            openapi.Parameter('is_read', openapi.IN_QUERY, description='Фильтр по статусу прочтения (true/false). Если не указан, возвращаются все уведомления.', type=openapi.TYPE_BOOLEAN, required=False),
+            openapi.Parameter('page', openapi.IN_QUERY, description='Номер страницы', type=openapi.TYPE_INTEGER, required=False),
+            openapi.Parameter('limit', openapi.IN_QUERY, description='Количество элементов на странице', type=openapi.TYPE_INTEGER, required=False),
+        ],
         responses={
             200: openapi.Response(
                 'Список уведомлений',
@@ -65,13 +70,40 @@ class NotificationListAPIView(APIView):
     )
     def get(self, request):
         try:
+            from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+            
             user = request.user
             
-            # Получаем только непрочитанные уведомления
-            notifications = Notification.objects.filter(
-                recipient=user,
-                is_read=False
-            ).select_related('actor', 'user_object').order_by('-created_at')
+            # Получаем все уведомления пользователя
+            queryset = Notification.objects.filter(recipient=user, is_read=False)
+            
+            # Фильтр по is_read, если указан
+            is_read_param = request.query_params.get('is_read')
+            if is_read_param is not None:
+                is_read_value = is_read_param.lower() in ('true', '1', 'yes')
+                queryset = queryset.filter(is_read=is_read_value)
+            
+            queryset = queryset.select_related('actor', 'user_object', 'target_content_type').prefetch_related('target').order_by('-created_at')
+            
+            # Пагинация
+            page = request.query_params.get('page', 1)
+            limit = request.query_params.get('limit', 20)
+            
+            try:
+                page = int(page)
+                limit = int(limit)
+            except ValueError:
+                page = 1
+                limit = 20
+            
+            paginator = Paginator(queryset, limit)
+            
+            try:
+                notifications = paginator.page(page)
+            except EmptyPage:
+                notifications = paginator.page(paginator.num_pages)
+            except PageNotAnInteger:
+                notifications = paginator.page(1)
             
             serializer = NotificationSerializer(notifications, many=True)
             
@@ -79,7 +111,16 @@ class NotificationListAPIView(APIView):
                 'success': True,
                 'message': 'Список уведомлений получен успешно',
                 'data': serializer.data,
-                'count': notifications.count()
+                'count': paginator.count,
+                'unread_count': Notification.objects.filter(recipient=user, is_read=False).count(),
+                'pagination': {
+                    'current_page': notifications.number,
+                    'total_pages': paginator.num_pages,
+                    'total_items': paginator.count,
+                    'items_per_page': limit,
+                    'has_next': notifications.has_next(),
+                    'has_previous': notifications.has_previous(),
+                }
             }, status=status.HTTP_200_OK)
             
         except Exception as e:

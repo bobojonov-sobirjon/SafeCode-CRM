@@ -8,6 +8,7 @@ class NotificationSerializer(serializers.ModelSerializer):
     """
     actor = serializers.SerializerMethodField()
     user_object = serializers.SerializerMethodField()
+    target = serializers.SerializerMethodField()
     
     class Meta:
         model = Notification
@@ -17,6 +18,7 @@ class NotificationSerializer(serializers.ModelSerializer):
             'verb',
             'message',
             'user_object',
+            'target',
             'category',
             'is_read',
             'created_at'
@@ -44,6 +46,28 @@ class NotificationSerializer(serializers.ModelSerializer):
             return {
                 'id': obj.user_object.id,
                 'name': obj.user_object.name,
+            }
+        return None
+    
+    def get_target(self, obj):
+        """
+        Получение информации о связанном объекте (например, Bills)
+        """
+        if obj.target:
+            # Если target - это Bills
+            from apps.v1.documents.models import Bills
+            if isinstance(obj.target, Bills):
+                return {
+                    'type': 'bill',
+                    'id': obj.target.id,
+                    'price': str(obj.target.price) if obj.target.price else None,
+                    'status': obj.target.status,
+                    'comment': obj.target.comment,
+                }
+            # Если target - это другой тип объекта
+            return {
+                'type': obj.target_content_type.model if obj.target_content_type else None,
+                'id': obj.target_object_id,
             }
         return None
 
