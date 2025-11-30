@@ -81,9 +81,22 @@ class JournalsAndActsListCreateAPIView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     @swagger_auto_schema(
-        operation_description="Создание нового журнала/акта",
+        operation_description="Создание нового журнала/акта. Поле type может принимать значения: 'estimate' (Смета), 'act' (Акт), 'form' (Форма)",
         tags=['Journals and Acts'],
-        request_body=JournalsAndActsCreateSerializer,
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['object_id'],
+            properties={
+                'object_id': openapi.Schema(type=openapi.TYPE_INTEGER, description='ID объекта пользователя'),
+                'type': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    enum=['estimate', 'act', 'form'],
+                    description='Тип: estimate (Смета), act (Акт), form (Форма)',
+                    default=None
+                ),
+                'date': openapi.Schema(type=openapi.FORMAT_DATE, description='Дата (YYYY-MM-DD)', default=None)
+            }
+        ),
         responses={201: 'Created', 400: 'Bad Request', 401: 'Unauthorized'},
         security=[{'Bearer': []}]
     )

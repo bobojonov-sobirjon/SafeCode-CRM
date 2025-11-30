@@ -14,7 +14,7 @@ class JournalsAndActsSerializer(serializers.ModelSerializer):
     class Meta:
         model = JournalsAndActs
         fields = [
-            'id', 'object_id', 'tip', 'date', 'user', 'created_at'
+            'id', 'object_id', 'type', 'date', 'user', 'created_at'
         ]
         read_only_fields = ['id', 'user', 'created_at']
     
@@ -50,11 +50,17 @@ class JournalsAndActsCreateSerializer(serializers.ModelSerializer):
         queryset=UserObject.objects.filter(is_deleted=False),
         error_messages={'does_not_exist': 'Объект не найден или удален.'}
     )
+    type = serializers.ChoiceField(
+        choices=JournalsAndActs.Type.choices,
+        required=False,
+        allow_null=True,
+        help_text='Тип: estimate (Смета), act (Акт), form (Форма)'
+    )
     
     class Meta:
         model = JournalsAndActs
         fields = [
-            'object_id', 'tip', 'date'
+            'object_id', 'type', 'date'
         ]
     
     def create(self, validated_data):

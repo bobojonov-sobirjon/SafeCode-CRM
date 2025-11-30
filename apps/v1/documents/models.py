@@ -7,17 +7,24 @@ class JournalsAndActs(models.Model):
     """
     Журналы и акты
     """
+    
+    class Type(models.TextChoices):
+        ESTIMATE = 'estimate', 'Смета'
+        ACT = 'act', 'Акт'
+        FORM = 'form', 'Форма'
+        
     object_id = models.ForeignKey(
         UserObject,
         on_delete=models.CASCADE,
         related_name='journals_and_acts',
         verbose_name='Объект'
     )
-    tip = models.CharField(
+    type = models.CharField(
         max_length=255,
         verbose_name='Тип',
         null=True,
-        blank=True
+        blank=True,
+        choices=Type.choices
     )
     date = models.DateField(
         verbose_name='Дата',

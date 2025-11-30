@@ -4,9 +4,9 @@ from .models import JournalsAndActs, Bills
 
 @admin.register(JournalsAndActs)
 class JournalsAndActsAdmin(admin.ModelAdmin):
-    list_display = ['id', 'object_id', 'tip', 'date', 'user', 'created_at']
-    list_filter = ['tip', 'date', 'created_at']
-    search_fields = ['object_id__name', 'user__email', 'tip']
+    list_display = ['id', 'object_id', 'type', 'date', 'user', 'created_at']
+    list_filter = ['type', 'date', 'created_at']
+    search_fields = ['object_id__name', 'user__email', 'type']
     readonly_fields = ['created_at']
     ordering = ['-created_at']
 
