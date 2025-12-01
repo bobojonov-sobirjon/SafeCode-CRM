@@ -307,3 +307,58 @@ class UserObjectDocumentCreateSerializer(serializers.Serializer):
             'document_items': document_items
         }
 
+
+class UserObjectDocumentItemSerializer(serializers.ModelSerializer):
+    """
+    Сериализатор для элементов документа
+    """
+    document_url = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = UserObjectDocumentItems
+        fields = ['id', 'document_url', 'created_at']
+        read_only_fields = ['id', 'created_at']
+    
+    def get_document_url(self, obj):
+        """
+        Получение URL документа
+        """
+        if obj.document:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.document.url)
+            return obj.document.url
+        return None
+
+
+class UserObjectDocumentSerializer(serializers.ModelSerializer):
+    """
+    Сериализатор для чтения документов объекта пользователя
+    """
+    object = serializers.SerializerMethodField()
+    file_datas = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = UserObjectDocuments
+        fields = ['id', 'object', 'comment', 'file_datas', 'created_at']
+        read_only_fields = ['id', 'created_at']
+    
+    def get_object(self, obj):
+        """
+        Получение информации об объекте
+        """
+        if obj.user_object:
+            return {
+                'id': obj.user_object.id,
+                'name': obj.user_object.name,
+                'address': obj.user_object.address,
+            }
+        return None
+    
+    def get_file_datas(self, obj):
+        """
+        Получение данных о файлах (UserObjectDocumentItems)
+        """
+        items = obj.user_object_document_items.all().order_by('-created_at')
+        serializer = UserObjectDocumentItemSerializer(items, many=True, context=self.context)
+        return serializer.data

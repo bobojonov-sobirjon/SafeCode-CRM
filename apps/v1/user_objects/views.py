@@ -6,10 +6,11 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from .models import UserObject
+from .models import UserObject, UserObjectDocuments, UserObjectDocuments
 from .serializers import (
     UserObjectSerializer, UserObjectCreateSerializer, UserObjectUpdateSerializer,
-    UserObjectWorkersAddSerializer, WorkerSerializer, UserObjectDocumentCreateSerializer
+    UserObjectWorkersAddSerializer, WorkerSerializer, UserObjectDocumentCreateSerializer,
+    UserObjectDocumentSerializer
 )
 from apps.v1.accounts.error_handlers import get_error_message
 from apps.v1.accounts.models import CustomUser
@@ -866,6 +867,75 @@ class UserObjectStatusUpdateAPIView(APIView):
                 'success': True,
                 'message': f'Статус объекта успешно изменен на {status_text}',
                 'data': serializer.data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': get_error_message('server_error'),
+                'errors': {'detail': str(e)}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class UserObjectDocumentsListAPIView(APIView):
+    """
+    Список документов объектов пользователя (фильтруется по текущему пользователю)
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @swagger_auto_schema(
+        operation_description="Получение списка документов объектов пользователя текущего пользователя с пагинацией. Возвращает: object (информация об объекте), comment, file_datas (список файлов с URL), created_at",
+        tags=['User Objects'],
+        manual_parameters=[
+            openapi.Parameter('page', openapi.IN_QUERY, description='Номер страницы', type=openapi.TYPE_INTEGER, required=False),
+            openapi.Parameter('limit', openapi.IN_QUERY, description='Количество элементов на странице', type=openapi.TYPE_INTEGER, required=False),
+        ],
+        responses={200: 'OK', 401: 'Unauthorized'},
+        security=[{'Bearer': []}]
+    )
+    def get(self, request):
+        try:
+            user = request.user
+            
+            # Фильтруем только по текущему пользователю
+            queryset = UserObjectDocuments.objects.filter(user=user).select_related(
+                'user_object', 'user'
+            ).prefetch_related('user_object_document_items').order_by('-created_at')
+            
+            # Пагинация
+            page = request.query_params.get('page', 1)
+            limit = request.query_params.get('limit', 10)
+            
+            try:
+                page = int(page)
+                limit = int(limit)
+            except ValueError:
+                page = 1
+                limit = 10
+            
+            paginator = Paginator(queryset, limit)
+            
+            try:
+                documents = paginator.page(page)
+            except EmptyPage:
+                documents = paginator.page(paginator.num_pages)
+            except PageNotAnInteger:
+                documents = paginator.page(1)
+            
+            serializer = UserObjectDocumentSerializer(documents, many=True, context={'request': request})
+            
+            return Response({
+                'success': True,
+                'message': 'Документы получены успешно',
+                'data': serializer.data,
+                'pagination': {
+                    'current_page': documents.number,
+                    'total_pages': paginator.num_pages,
+                    'total_items': paginator.count,
+                    'items_per_page': limit,
+                    'has_next': documents.has_next(),
+                    'has_previous': documents.has_previous(),
+                }
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
