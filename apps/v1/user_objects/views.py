@@ -5,7 +5,6 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from .models import UserObject, UserObjectDocuments, UserObjectDocuments
 from .serializers import (
     UserObjectSerializer, UserObjectCreateSerializer, UserObjectUpdateSerializer,
@@ -16,9 +15,10 @@ from apps.v1.accounts.error_handlers import get_error_message
 from apps.v1.accounts.models import CustomUser
 from django.contrib.auth.models import Group
 from .utils import get_user_objects_queryset, apply_user_objects_filters
+from apps.v1.documents.mixins import PaginationMixin
 
 
-class UserObjectListCreateAPIView(APIView):
+class UserObjectListCreateAPIView(PaginationMixin, APIView):
     """
     Список и создание объектов пользователя
     """
@@ -49,50 +49,17 @@ class UserObjectListCreateAPIView(APIView):
             # Применяем фильтры
             queryset = apply_user_objects_filters(queryset, request)
             
-            # Пагинация
-            page = request.query_params.get('page', 1)
-            limit = request.query_params.get('limit', 10)
-            
-            try:
-                page = int(page)
-                limit = int(limit)
-            except (ValueError, TypeError):
-                page = 1
-                limit = 10
-            
-            if limit > 100:
-                limit = 100
-            if limit < 1:
-                limit = 10
-            
-            paginator = Paginator(queryset, limit)
-            total_items = paginator.count
-            total_pages = paginator.num_pages
-            
-            try:
-                objects_page = paginator.page(page)
-            except PageNotAnInteger:
-                objects_page = paginator.page(1)
-                page = 1
-            except EmptyPage:
-                objects_page = paginator.page(total_pages)
-                page = total_pages
+            # Pagination Mixin ishlatilmoqda
+            objects_page, paginator = self.paginate_queryset(queryset, request)
             
             serializer = UserObjectSerializer(objects_page, many=True, context={'request': request})
             
-            return Response({
-                'success': True,
-                'message': 'Список объектов получен успешно',
-                'data': serializer.data,
-                'pagination': {
-                    'current_page': page,
-                    'total_pages': total_pages,
-                    'total_items': total_items,
-                    'limit': limit,
-                    'has_next': objects_page.has_next(),
-                    'has_previous': objects_page.has_previous(),
-                }
-            }, status=status.HTTP_200_OK)
+            return self.get_paginated_response(
+                objects_page,
+                paginator,
+                serializer.data,
+                'Список объектов получен успешно'
+            )
             
         except Exception as e:
             return Response({
@@ -237,7 +204,7 @@ class UserObjectDocumentCreateAPIView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class UserObjectAllListAPIView(APIView):
+class UserObjectAllListAPIView(PaginationMixin, APIView):
     """
     Список всех объектов пользователей (для админов)
     """
@@ -260,55 +227,24 @@ class UserObjectAllListAPIView(APIView):
     )
     def get(self, request):
         try:
-            queryset = UserObject.objects.filter(is_deleted=False).select_related('user')
+            queryset = UserObject.objects.filter(is_deleted=False)\
+                .select_related('user')\
+                .prefetch_related('user_object_workers', 'user_object_documents')
             
             # Применяем фильтры
             queryset = apply_user_objects_filters(queryset, request)
             
-            # Пагинация
-            page = request.query_params.get('page', 1)
-            limit = request.query_params.get('limit', 10)
-            
-            try:
-                page = int(page)
-                limit = int(limit)
-            except (ValueError, TypeError):
-                page = 1
-                limit = 10
-            
-            if limit > 100:
-                limit = 100
-            if limit < 1:
-                limit = 10
-            
-            paginator = Paginator(queryset, limit)
-            total_items = paginator.count
-            total_pages = paginator.num_pages
-            
-            try:
-                objects_page = paginator.page(page)
-            except PageNotAnInteger:
-                objects_page = paginator.page(1)
-                page = 1
-            except EmptyPage:
-                objects_page = paginator.page(total_pages)
-                page = total_pages
+            # Pagination Mixin ishlatilmoqda
+            objects_page, paginator = self.paginate_queryset(queryset, request)
             
             serializer = UserObjectSerializer(objects_page, many=True, context={'request': request})
             
-            return Response({
-                'success': True,
-                'message': 'Список всех объектов получен успешно',
-                'data': serializer.data,
-                'pagination': {
-                    'current_page': page,
-                    'total_pages': total_pages,
-                    'total_items': total_items,
-                    'limit': limit,
-                    'has_next': objects_page.has_next(),
-                    'has_previous': objects_page.has_previous(),
-                }
-            }, status=status.HTTP_200_OK)
+            return self.get_paginated_response(
+                objects_page,
+                paginator,
+                serializer.data,
+                'Список всех объектов получен успешно'
+            )
             
         except Exception as e:
             return Response({
@@ -898,45 +834,22 @@ class UserObjectDocumentsListAPIView(APIView):
             user = request.user
             
             # Фильтруем только по текущему пользователю
-            queryset = UserObjectDocuments.objects.filter(user=user).select_related(
-                'user_object', 'user'
-            ).prefetch_related('user_object_document_items').order_by('-created_at')
+            queryset = UserObjectDocuments.objects.filter(user=user)\
+                .select_related('user_object', 'user')\
+                .prefetch_related('user_object_document_items')\
+                .order_by('-created_at')
             
-            # Пагинация
-            page = request.query_params.get('page', 1)
-            limit = request.query_params.get('limit', 10)
-            
-            try:
-                page = int(page)
-                limit = int(limit)
-            except ValueError:
-                page = 1
-                limit = 10
-            
-            paginator = Paginator(queryset, limit)
-            
-            try:
-                documents = paginator.page(page)
-            except EmptyPage:
-                documents = paginator.page(paginator.num_pages)
-            except PageNotAnInteger:
-                documents = paginator.page(1)
+            # Pagination Mixin ishlatilmoqda
+            documents, paginator = self.paginate_queryset(queryset, request)
             
             serializer = UserObjectDocumentSerializer(documents, many=True, context={'request': request})
             
-            return Response({
-                'success': True,
-                'message': 'Документы получены успешно',
-                'data': serializer.data,
-                'pagination': {
-                    'current_page': documents.number,
-                    'total_pages': paginator.num_pages,
-                    'total_items': paginator.count,
-                    'items_per_page': limit,
-                    'has_next': documents.has_next(),
-                    'has_previous': documents.has_previous(),
-                }
-            }, status=status.HTTP_200_OK)
+            return self.get_paginated_response(
+                documents,
+                paginator,
+                serializer.data,
+                'Документы получены успешно'
+            )
             
         except Exception as e:
             return Response({

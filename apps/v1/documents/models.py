@@ -48,6 +48,11 @@ class JournalsAndActs(models.Model):
         verbose_name = 'Журнал и акт'
         verbose_name_plural = 'Журналы и акты'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at'], name='journals_user_created_idx'),
+            models.Index(fields=['object_id', '-created_at'], name='journals_object_created_idx'),
+            models.Index(fields=['object_id', 'user'], name='journals_object_user_idx'),
+        ]
     
     def __str__(self):
         return f"Журнал/Акт #{self.id} - {self.object_id.name if self.object_id else 'N/A'}"
@@ -141,6 +146,12 @@ class Bills(models.Model):
         verbose_name = 'Счет'
         verbose_name_plural = 'Счета'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at'], name='bills_user_created_idx'),
+            models.Index(fields=['object_id', '-created_at'], name='bills_object_created_idx'),
+            models.Index(fields=['status', '-created_at'], name='bills_status_created_idx'),
+            models.Index(fields=['object_id', 'user'], name='bills_object_user_idx'),
+        ]
     
     def __str__(self):
         return f"Счет #{self.id} - {self.object_id.name if self.object_id else 'N/A'}"

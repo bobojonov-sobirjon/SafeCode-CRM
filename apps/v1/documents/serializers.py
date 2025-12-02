@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import JournalsAndActs, Bills, JournalAndActDocuments, BillDocuments
 from apps.v1.user_objects.models import UserObject
 from apps.v1.accounts.models import CustomUser
+from .mixins import FileValidationMixin
 
 
 class JournalsAndActsDocumentSerializer(serializers.ModelSerializer):
@@ -74,7 +75,7 @@ class JournalsAndActsSerializer(serializers.ModelSerializer):
         return serializer.data
 
 
-class JournalsAndActsCreateSerializer(serializers.Serializer):
+class JournalsAndActsCreateSerializer(FileValidationMixin, serializers.Serializer):
     """
     Сериализатор для создания JournalsAndActs с документами
     """
@@ -164,12 +165,26 @@ class JournalsAndActsCreateSerializer(serializers.Serializer):
                     else:
                         document_list = [files['document_list[]']]
         
+        # Fayllarni validatsiya qilish
+        if document_list:
+            self.validate_files(document_list)
+        
         internal_value['document_list'] = document_list
         return internal_value
+    
+    def validate(self, attrs):
+        """
+        Fayllarni validatsiya qilish
+        """
+        document_list = attrs.get('document_list', [])
+        if document_list:
+            self.validate_files(document_list)
+        return attrs
     
     def create(self, validated_data):
         """
         Создание журнала/акта с документами
+        Bulk operations ishlatilmoqda - tezroq ishlash uchun
         """
         user = self.context['request'].user
         object_id = validated_data['object_id']
@@ -185,17 +200,21 @@ class JournalsAndActsCreateSerializer(serializers.Serializer):
             date=date_value
         )
         
-        # Создаем документы
-        for document_file in document_list:
-            JournalAndActDocuments.objects.create(
-                journal_and_act_id=journal_and_act,
-                document=document_file
-            )
+        # Bulk create ishlatilmoqda - tezroq ishlash uchun
+        if document_list:
+            documents = [
+                JournalAndActDocuments(
+                    journal_and_act_id=journal_and_act,
+                    document=document_file
+                )
+                for document_file in document_list
+            ]
+            JournalAndActDocuments.objects.bulk_create(documents)
         
         return journal_and_act
 
 
-class JournalsAndActsUpdateSerializer(serializers.Serializer):
+class JournalsAndActsUpdateSerializer(FileValidationMixin, serializers.Serializer):
     """
     Сериализатор для обновления JournalsAndActs с документами
     """
@@ -246,12 +265,17 @@ class JournalsAndActsUpdateSerializer(serializers.Serializer):
         if request and hasattr(request, 'FILES'):
             document_list = request.FILES.getlist('document_list')
         
+        # Fayllarni validatsiya qilish
+        if document_list:
+            self.validate_files(document_list)
+        
         internal_value['document_list'] = document_list
         return internal_value
     
     def update(self, instance, validated_data):
         """
         Обновление журнала/акта с документами
+        Bulk operations ishlatilmoqda - tezroq ishlash uchun
         """
         # Обновляем основные поля
         if 'object_id' in validated_data:
@@ -270,12 +294,15 @@ class JournalsAndActsUpdateSerializer(serializers.Serializer):
                 # Удаляем старые документы
                 instance.journal_and_act_documents.all().delete()
                 
-                # Создаем новые документы
-                for document_file in document_list:
-                    JournalAndActDocuments.objects.create(
+                # Bulk create ishlatilmoqda - tezroq ishlash uchun
+                documents = [
+                    JournalAndActDocuments(
                         journal_and_act_id=instance,
                         document=document_file
                     )
+                    for document_file in document_list
+                ]
+                JournalAndActDocuments.objects.bulk_create(documents)
         
         return instance
 
@@ -350,7 +377,7 @@ class BillsSerializer(serializers.ModelSerializer):
         return serializer.data
 
 
-class BillsCreateSerializer(serializers.Serializer):
+class BillsCreateSerializer(FileValidationMixin, serializers.Serializer):
     """
     Сериализатор для создания Bills с документами
     """
@@ -451,12 +478,26 @@ class BillsCreateSerializer(serializers.Serializer):
                     else:
                         document_list = [files['document_list[]']]
         
+        # Fayllarni validatsiya qilish
+        if document_list:
+            self.validate_files(document_list)
+        
         internal_value['document_list'] = document_list
         return internal_value
+    
+    def validate(self, attrs):
+        """
+        Fayllarni validatsiya qilish
+        """
+        document_list = attrs.get('document_list', [])
+        if document_list:
+            self.validate_files(document_list)
+        return attrs
     
     def create(self, validated_data):
         """
         Создание счета с документами
+        Bulk operations ishlatilmoqda - tezroq ishlash uchun
         """
         user = self.context['request'].user
         object_id = validated_data['object_id']
@@ -474,17 +515,21 @@ class BillsCreateSerializer(serializers.Serializer):
             status=status_value
         )
         
-        # Создаем документы
-        for document_file in document_list:
-            BillDocuments.objects.create(
-                bill_id=bill,
-                document=document_file
-            )
+        # Bulk create ishlatilmoqda - tezroq ishlash uchun
+        if document_list:
+            documents = [
+                BillDocuments(
+                    bill_id=bill,
+                    document=document_file
+                )
+                for document_file in document_list
+            ]
+            BillDocuments.objects.bulk_create(documents)
         
         return bill
 
 
-class BillsUpdateSerializer(serializers.Serializer):
+class BillsUpdateSerializer(FileValidationMixin, serializers.Serializer):
     """
     Сериализатор для обновления Bills с документами
     """
@@ -547,12 +592,17 @@ class BillsUpdateSerializer(serializers.Serializer):
         if request and hasattr(request, 'FILES'):
             document_list = request.FILES.getlist('document_list')
         
+        # Fayllarni validatsiya qilish
+        if document_list:
+            self.validate_files(document_list)
+        
         internal_value['document_list'] = document_list
         return internal_value
     
     def update(self, instance, validated_data):
         """
         Обновление счета с документами
+        Bulk operations ishlatilmoqda - tezroq ishlash uchun
         """
         # Обновляем основные поля
         if 'object_id' in validated_data:
@@ -573,12 +623,15 @@ class BillsUpdateSerializer(serializers.Serializer):
                 # Удаляем старые документы
                 instance.bill_documents.all().delete()
                 
-                # Создаем новые документы
-                for document_file in document_list:
-                    BillDocuments.objects.create(
+                # Bulk create ishlatilmoqda - tezroq ishlash uchun
+                documents = [
+                    BillDocuments(
                         bill_id=instance,
                         document=document_file
                     )
+                    for document_file in document_list
+                ]
+                BillDocuments.objects.bulk_create(documents)
         
         return instance
 

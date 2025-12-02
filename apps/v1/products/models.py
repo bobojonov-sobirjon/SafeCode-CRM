@@ -12,6 +12,9 @@ class Category(models.Model):
     class Meta:
         verbose_name = "Категория"
         verbose_name_plural = "01. Категории"
+        indexes = [
+            models.Index(fields=['-created_at'], name='category_created_idx'),
+        ]
         
     def __str__(self):
         return self.name or f"Category {self.id}"
@@ -35,6 +38,11 @@ class Product(models.Model):
         verbose_name = "Продукт"
         verbose_name_plural = "02. Продукты"
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['category', '-created_at'], name='product_category_created_idx'),
+            models.Index(fields=['is_active', 'is_deleted', '-created_at'], name='product_active_deleted_idx'),
+            models.Index(fields=['article'], name='product_article_idx'),
+        ]
     
     def __str__(self):
         return self.name or f"Product {self.id}"
@@ -52,6 +60,9 @@ class ProductImage(models.Model):
         verbose_name = "Изображение продукта"
         verbose_name_plural = "Изображения продуктов"
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['product', '-created_at'], name='pi_product_created_idx'),
+        ]
         
     def __str__(self):
         return self.product.name if self.product else f"Image {self.id}"
@@ -97,6 +108,10 @@ class FavoriteProduct(models.Model):
         verbose_name_plural = "Избранные продукты"
         ordering = ['-created_at']
         unique_together = ('user', 'product')  # Один пользователь не может добавить один продукт дважды
+        indexes = [
+            models.Index(fields=['user', '-created_at'], name='fp_user_created_idx'),
+            models.Index(fields=['product'], name='fp_product_idx'),
+        ]
     
     def __str__(self):
         return f"{self.user.email} - {self.product.name}"

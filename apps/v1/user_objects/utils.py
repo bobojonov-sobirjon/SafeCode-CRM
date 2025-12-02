@@ -16,10 +16,14 @@ def get_user_objects_queryset(user):
     
     if is_customer:
         # Заказчик видит только свои объекты
-        queryset = UserObject.objects.filter(user=user, is_deleted=False).select_related('user')
+        queryset = UserObject.objects.filter(user=user, is_deleted=False)\
+            .select_related('user')\
+            .prefetch_related('user_object_workers', 'user_object_documents')
     elif is_admin:
         # Администратор видит все объекты
-        queryset = UserObject.objects.filter(is_deleted=False).select_related('user')
+        queryset = UserObject.objects.filter(is_deleted=False)\
+            .select_related('user')\
+            .prefetch_related('user_object_workers', 'user_object_documents')
     else:
         # Другие роли видят объекты, где они являются работниками
         worker_objects = UserObjectWorkers.objects.filter(
@@ -29,7 +33,8 @@ def get_user_objects_queryset(user):
         queryset = UserObject.objects.filter(
             id__in=worker_objects,
             is_deleted=False
-        ).select_related('user')
+        ).select_related('user')\
+         .prefetch_related('user_object_workers', 'user_object_documents')
     
     return queryset
 

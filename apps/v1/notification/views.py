@@ -14,6 +14,7 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from .serializers import NotificationSerializer
 from apps.v1.accounts.error_handlers import get_error_message
+from apps.v1.documents.mixins import PaginationMixin
 
 
 @shared_task
@@ -45,7 +46,7 @@ def notify_expiring_services():
                 pass
 
 
-class NotificationListAPIView(APIView):
+class NotificationListAPIView(PaginationMixin, APIView):
     """
     Получение списка уведомлений текущего пользователя
     """
@@ -75,7 +76,7 @@ class NotificationListAPIView(APIView):
             user = request.user
             
             # Получаем все уведомления пользователя
-            queryset = Notification.objects.filter(recipient=user, is_read=False)
+            queryset = Notification.objects.filter(recipient=user)
             
             # Фильтр по is_read, если указан
             is_read_param = request.query_params.get('is_read')
@@ -83,45 +84,29 @@ class NotificationListAPIView(APIView):
                 is_read_value = is_read_param.lower() in ('true', '1', 'yes')
                 queryset = queryset.filter(is_read=is_read_value)
             
-            queryset = queryset.select_related('actor', 'user_object', 'target_content_type').prefetch_related('target').order_by('-created_at')
+            # prefetch_related va select_related qo'shildi - N+1 query muammosini hal qilish uchun
+            queryset = queryset.select_related('actor', 'user_object', 'target_content_type')\
+                .order_by('-created_at')
             
-            # Пагинация
-            page = request.query_params.get('page', 1)
-            limit = request.query_params.get('limit', 20)
-            
-            try:
-                page = int(page)
-                limit = int(limit)
-            except ValueError:
-                page = 1
-                limit = 20
-            
-            paginator = Paginator(queryset, limit)
-            
-            try:
-                notifications = paginator.page(page)
-            except EmptyPage:
-                notifications = paginator.page(paginator.num_pages)
-            except PageNotAnInteger:
-                notifications = paginator.page(1)
+            # Pagination Mixin ishlatilmoqda
+            notifications, paginator = self.paginate_queryset(queryset, request, page_size=20)
             
             serializer = NotificationSerializer(notifications, many=True)
             
-            return Response({
-                'success': True,
-                'message': 'Список уведомлений получен успешно',
-                'data': serializer.data,
-                'count': paginator.count,
-                'unread_count': Notification.objects.filter(recipient=user, is_read=False).count(),
-                'pagination': {
-                    'current_page': notifications.number,
-                    'total_pages': paginator.num_pages,
-                    'total_items': paginator.count,
-                    'items_per_page': limit,
-                    'has_next': notifications.has_next(),
-                    'has_previous': notifications.has_previous(),
-                }
-            }, status=status.HTTP_200_OK)
+            # Unread count
+            unread_count = Notification.objects.filter(recipient=user, is_read=False).count()
+            
+            response_data = self.get_paginated_response(
+                notifications,
+                paginator,
+                serializer.data,
+                'Список уведомлений получен успешно'
+            )
+            
+            # Unread count qo'shamiz
+            response_data.data['unread_count'] = unread_count
+            
+            return response_data
             
         except Exception as e:
             return Response({

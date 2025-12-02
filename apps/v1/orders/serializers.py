@@ -219,25 +219,38 @@ class OrderCreateSerializer(serializers.Serializer):
         )
         
         # Создаем элементы заказа и вычисляем общую цену
+        # Bulk operations ishlatilmoqda - tezroq ishlash uchun
         total_price = Decimal('0')
         if delivery_method and delivery_method.price:
             total_price += delivery_method.price
         
+        # Product'larni bir marta olish
+        product_ids = [item['product_id'] for item in items_data]
+        products = {p.id: p for p in Product.objects.filter(id__in=product_ids)}
+        
+        # Bulk create uchun OrderItem'lar ro'yxati
+        order_items = []
         for item_data in items_data:
             product_id = item_data['product_id']
             quantity = item_data['quantity']
-            product = Product.objects.get(id=product_id)
+            product = products.get(product_id)
             
-            # Создаем элемент заказа
-            OrderItem.objects.create(
-                order=order,
-                product=product,
-                quantity=quantity
-            )
-            
-            # Добавляем к общей цене
-            if product.price:
-                total_price += product.price * quantity
+            if product:
+                order_items.append(
+                    OrderItem(
+                        order=order,
+                        product=product,
+                        quantity=quantity
+                    )
+                )
+                
+                # Добавляем к общей цене
+                if product.price:
+                    total_price += product.price * quantity
+        
+        # Bulk create
+        if order_items:
+            OrderItem.objects.bulk_create(order_items)
         
         # Обновляем общую цену заказа
         order.total_price = total_price

@@ -128,16 +128,29 @@ class UserObjectWorkersAddSerializer(serializers.Serializer):
         user_object.save()
         
         # Создаем записи для работников
-        created_workers = []
-        for worker_id in worker_ids:
-            # Проверяем, не добавлен ли уже этот работник
-            worker, created = UserObjectWorkers.objects.get_or_create(
-                user_object=user_object,
-                user_id=worker_id,
-                defaults={'is_finished': False}
-            )
-            if created:
-                created_workers.append(worker)
+        # Bulk operations ishlatilmoqda - tezroq ishlash uchun
+        # Avval mavjud bo'lganlarini tekshiramiz
+        existing_workers = UserObjectWorkers.objects.filter(
+            user_object=user_object,
+            user_id__in=worker_ids
+        ).values_list('user_id', flat=True)
+        
+        # Yangi qo'shiladigan worker ID'larni topamiz
+        new_worker_ids = [wid for wid in worker_ids if wid not in existing_workers]
+        
+        # Bulk create
+        if new_worker_ids:
+            workers_to_create = [
+                UserObjectWorkers(
+                    user_object=user_object,
+                    user_id=worker_id,
+                    is_finished=False
+                )
+                for worker_id in new_worker_ids
+            ]
+            created_workers = UserObjectWorkers.objects.bulk_create(workers_to_create)
+        else:
+            created_workers = []
         
         # Отправляем одно уведомление создателю объекта со всеми ролями
         if created_workers:
@@ -288,14 +301,18 @@ class UserObjectDocumentCreateSerializer(serializers.Serializer):
             comment=comment
         )
         
-        # Создаем элементы документа
-        document_items = []
-        for document_file in document_list:
-            item = UserObjectDocumentItems.objects.create(
-                user_object_document=user_object_document,
-                document=document_file
-            )
-            document_items.append(item)
+        # Bulk create ishlatilmoqda - tezroq ishlash uchun
+        if document_list:
+            document_items = [
+                UserObjectDocumentItems(
+                    user_object_document=user_object_document,
+                    document=document_file
+                )
+                for document_file in document_list
+            ]
+            UserObjectDocumentItems.objects.bulk_create(document_items)
+        else:
+            document_items = []
         
         # Если пользователь с ролью "Менеджер" создал документ, меняем статус объекта на COMPLETED
         if user.groups.filter(name='Менеджер').exists():

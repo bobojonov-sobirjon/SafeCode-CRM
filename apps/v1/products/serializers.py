@@ -52,14 +52,20 @@ class ProductSerializer(serializers.ModelSerializer):
     def get_images_list(self, obj):
         """
         Получение списка изображений продукта
+        Prefetch_related ishlatilgan, shuning uchun N+1 query muammosi yo'q
         """
-        images = ProductImage.objects.filter(product=obj)
+        # Prefetch_related orqali allaqachon yuklangan
+        if hasattr(obj, 'productimage_set'):
+            images = obj.productimage_set.all()
+        else:
+            images = ProductImage.objects.filter(product=obj)
         return ProductImageSerializer(images, many=True, context=self.context).data
     
     def get_sizes_list(self, obj):
         """
         Получение списка размеров продукта
         """
+        # Prefetch_related qo'shish kerak bo'lsa, views.py da qo'shiladi
         sizes = ProductSizes.objects.filter(product=obj)
         return ProductSizesSerializer(sizes, many=True, context=self.context).data
     
@@ -124,9 +130,13 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         # Создаем продукт
         product = Product.objects.create(**validated_data)
         
-        # Создаем изображения
-        for image in images_list:
-            ProductImage.objects.create(product=product, image=image)
+        # Bulk create ishlatilmoqda - tezroq ishlash uchun
+        if images_list:
+            images = [
+                ProductImage(product=product, image=image)
+                for image in images_list
+            ]
+            ProductImage.objects.bulk_create(images)
         
         # Создаем размеры если указаны
         if width is not None or height is not None or depth is not None:
@@ -157,9 +167,13 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         if images_list is not None:
             # Удаляем старые изображения
             ProductImage.objects.filter(product=instance).delete()
-            # Создаем новые изображения
-            for image in images_list:
-                ProductImage.objects.create(product=instance, image=image)
+            # Bulk create ishlatilmoqda - tezroq ishlash uchun
+            if images_list:
+                images = [
+                    ProductImage(product=instance, image=image)
+                    for image in images_list
+                ]
+                ProductImage.objects.bulk_create(images)
         
         # Обновляем размеры если указаны
         if width is not None or height is not None or depth is not None:

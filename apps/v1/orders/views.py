@@ -11,9 +11,10 @@ from .serializers import (
     PaymentMethodSerializer, PaymentMethodCreateSerializer
 )
 from apps.v1.accounts.error_handlers import get_error_message
+from apps.v1.documents.mixins import PaginationMixin
 
 
-class OrderListCreateAPIView(APIView):
+class OrderListCreateAPIView(PaginationMixin, APIView):
     """
     Список и создание заказов текущего пользователя
     """
@@ -66,17 +67,22 @@ class OrderListCreateAPIView(APIView):
     def get(self, request):
         try:
             user = request.user
-            orders = Order.objects.filter(user=user).select_related(
-                'user', 'delivery_method', 'payment_method'
-            ).prefetch_related('items__product').order_by('-created_at')
+            queryset = Order.objects.filter(user=user)\
+                .select_related('user', 'delivery_method', 'payment_method')\
+                .prefetch_related('items__product')\
+                .order_by('-created_at')
             
-            serializer = OrderSerializer(orders, many=True)
+            # Pagination Mixin ishlatilmoqda
+            orders_page, paginator = self.paginate_queryset(queryset, request)
             
-            return Response({
-                'success': True,
-                'message': 'Список заказов получен успешно',
-                'data': serializer.data
-            }, status=status.HTTP_200_OK)
+            serializer = OrderSerializer(orders_page, many=True)
+            
+            return self.get_paginated_response(
+                orders_page,
+                paginator,
+                serializer.data,
+                'Список заказов получен успешно'
+            )
             
         except Exception as e:
             return Response({

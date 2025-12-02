@@ -46,6 +46,11 @@ class Notification(models.Model):
         verbose_name = "Уведомление"
         verbose_name_plural = "Уведомления"
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=['recipient', 'is_read', '-created_at'], name='notif_recip_read_created_idx'),
+            models.Index(fields=['recipient', '-created_at'], name='notif_recip_created_idx'),
+            models.Index(fields=['category', '-created_at'], name='notif_cat_created_idx'),
+        ]
 
     def __str__(self):
         return f"{self.recipient} - {self.verb}"

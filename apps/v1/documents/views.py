@@ -5,7 +5,6 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from .models import JournalsAndActs, Bills
 from .serializers import (
     JournalsAndActsSerializer, JournalsAndActsCreateSerializer, JournalsAndActsUpdateSerializer,
@@ -13,9 +12,10 @@ from .serializers import (
 )
 from apps.v1.accounts.error_handlers import get_error_message
 from apps.v1.user_objects.models import UserObject
+from .mixins import PaginationMixin
 
 
-class JournalsAndActsListCreateAPIView(APIView):
+class JournalsAndActsListCreateAPIView(PaginationMixin, APIView):
     """
     Список и создание журналов и актов
     """
@@ -37,43 +37,23 @@ class JournalsAndActsListCreateAPIView(APIView):
             user = request.user
             
             # Фильтруем только по текущему пользователю
-            queryset = JournalsAndActs.objects.filter(user=user).select_related('object_id', 'user').order_by('-created_at')
+            # prefetch_related qo'shildi - N+1 query muammosini hal qilish uchun
+            queryset = JournalsAndActs.objects.filter(user=user)\
+                .select_related('object_id', 'user')\
+                .prefetch_related('journal_and_act_documents')\
+                .order_by('-created_at')
             
-            # Пагинация
-            page = request.query_params.get('page', 1)
-            limit = request.query_params.get('limit', 10)
-            
-            try:
-                page = int(page)
-                limit = int(limit)
-            except ValueError:
-                page = 1
-                limit = 10
-            
-            paginator = Paginator(queryset, limit)
-            
-            try:
-                journals_and_acts = paginator.page(page)
-            except EmptyPage:
-                journals_and_acts = paginator.page(paginator.num_pages)
-            except PageNotAnInteger:
-                journals_and_acts = paginator.page(1)
+            # Pagination Mixin ishlatilmoqda
+            journals_and_acts, paginator = self.paginate_queryset(queryset, request)
             
             serializer = JournalsAndActsSerializer(journals_and_acts, many=True, context={'request': request})
             
-            return Response({
-                'success': True,
-                'message': 'Журналы и акты получены успешно',
-                'data': serializer.data,
-                'pagination': {
-                    'current_page': journals_and_acts.number,
-                    'total_pages': paginator.num_pages,
-                    'total_items': paginator.count,
-                    'items_per_page': limit,
-                    'has_next': journals_and_acts.has_next(),
-                    'has_previous': journals_and_acts.has_previous(),
-                }
-            }, status=status.HTTP_200_OK)
+            return self.get_paginated_response(
+                journals_and_acts, 
+                paginator, 
+                serializer.data, 
+                'Журналы и акты получены успешно'
+            )
             
         except Exception as e:
             return Response({
@@ -144,7 +124,11 @@ class JournalsAndActsDetailAPIView(APIView):
     def get(self, request, pk):
         try:
             user = request.user
-            journal_or_act = JournalsAndActs.objects.filter(pk=pk, user=user).select_related('object_id', 'user').first()
+            # prefetch_related qo'shildi - N+1 query muammosini hal qilish uchun
+            journal_or_act = JournalsAndActs.objects.filter(pk=pk, user=user)\
+                .select_related('object_id', 'user')\
+                .prefetch_related('journal_and_act_documents')\
+                .first()
             
             if not journal_or_act:
                 return Response({
@@ -227,7 +211,7 @@ class JournalsAndActsDetailAPIView(APIView):
         return self.put(request, pk)
 
 
-class BillsListCreateAPIView(APIView):
+class BillsListCreateAPIView(PaginationMixin, APIView):
     """
     Список и создание счетов
     """
@@ -249,43 +233,23 @@ class BillsListCreateAPIView(APIView):
             user = request.user
             
             # Фильтруем только по текущему пользователю
-            queryset = Bills.objects.filter(user=user).select_related('object_id', 'user').order_by('-created_at')
+            # prefetch_related qo'shildi - N+1 query muammosini hal qilish uchun
+            queryset = Bills.objects.filter(user=user)\
+                .select_related('object_id', 'user')\
+                .prefetch_related('bill_documents')\
+                .order_by('-created_at')
             
-            # Пагинация
-            page = request.query_params.get('page', 1)
-            limit = request.query_params.get('limit', 10)
-            
-            try:
-                page = int(page)
-                limit = int(limit)
-            except ValueError:
-                page = 1
-                limit = 10
-            
-            paginator = Paginator(queryset, limit)
-            
-            try:
-                bills = paginator.page(page)
-            except EmptyPage:
-                bills = paginator.page(paginator.num_pages)
-            except PageNotAnInteger:
-                bills = paginator.page(1)
+            # Pagination Mixin ishlatilmoqda
+            bills, paginator = self.paginate_queryset(queryset, request)
             
             serializer = BillsSerializer(bills, many=True, context={'request': request})
             
-            return Response({
-                'success': True,
-                'message': 'Счета получены успешно',
-                'data': serializer.data,
-                'pagination': {
-                    'current_page': bills.number,
-                    'total_pages': paginator.num_pages,
-                    'total_items': paginator.count,
-                    'items_per_page': limit,
-                    'has_next': bills.has_next(),
-                    'has_previous': bills.has_previous(),
-                }
-            }, status=status.HTTP_200_OK)
+            return self.get_paginated_response(
+                bills, 
+                paginator, 
+                serializer.data, 
+                'Счета получены успешно'
+            )
             
         except Exception as e:
             return Response({
@@ -357,7 +321,11 @@ class BillsDetailAPIView(APIView):
     def get(self, request, pk):
         try:
             user = request.user
-            bill = Bills.objects.filter(pk=pk, user=user).select_related('object_id', 'user').first()
+            # prefetch_related qo'shildi - N+1 query muammosini hal qilish uchun
+            bill = Bills.objects.filter(pk=pk, user=user)\
+                .select_related('object_id', 'user')\
+                .prefetch_related('bill_documents')\
+                .first()
             
             if not bill:
                 return Response({
@@ -441,7 +409,7 @@ class BillsDetailAPIView(APIView):
         return self.put(request, pk)
 
 
-class JournalsAndActsByObjectUserListAPIView(APIView):
+class JournalsAndActsByObjectUserListAPIView(PaginationMixin, APIView):
     """
     Список журналов и актов, отфильтрованных по пользователю объекта (не по создателю)
     """
@@ -462,43 +430,23 @@ class JournalsAndActsByObjectUserListAPIView(APIView):
             user = request.user
             
             # Фильтруем по пользователю объекта (UserObject.user), а не по создателю
-            queryset = JournalsAndActs.objects.filter(object_id__user=user).select_related('object_id', 'user', 'object_id__user').order_by('-created_at')
+            # prefetch_related qo'shildi - N+1 query muammosini hal qilish uchun
+            queryset = JournalsAndActs.objects.filter(object_id__user=user)\
+                .select_related('object_id', 'user', 'object_id__user')\
+                .prefetch_related('journal_and_act_documents')\
+                .order_by('-created_at')
             
-            # Пагинация
-            page = request.query_params.get('page', 1)
-            limit = request.query_params.get('limit', 10)
-            
-            try:
-                page = int(page)
-                limit = int(limit)
-            except ValueError:
-                page = 1
-                limit = 10
-            
-            paginator = Paginator(queryset, limit)
-            
-            try:
-                journals_and_acts = paginator.page(page)
-            except EmptyPage:
-                journals_and_acts = paginator.page(paginator.num_pages)
-            except PageNotAnInteger:
-                journals_and_acts = paginator.page(1)
+            # Pagination Mixin ishlatilmoqda
+            journals_and_acts, paginator = self.paginate_queryset(queryset, request)
             
             serializer = JournalsAndActsSerializer(journals_and_acts, many=True, context={'request': request})
             
-            return Response({
-                'success': True,
-                'message': 'Журналы и акты получены успешно',
-                'data': serializer.data,
-                'pagination': {
-                    'current_page': journals_and_acts.number,
-                    'total_pages': paginator.num_pages,
-                    'total_items': paginator.count,
-                    'items_per_page': limit,
-                    'has_next': journals_and_acts.has_next(),
-                    'has_previous': journals_and_acts.has_previous(),
-                }
-            }, status=status.HTTP_200_OK)
+            return self.get_paginated_response(
+                journals_and_acts, 
+                paginator, 
+                serializer.data, 
+                'Журналы и акты получены успешно'
+            )
             
         except Exception as e:
             return Response({
@@ -508,7 +456,7 @@ class JournalsAndActsByObjectUserListAPIView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class BillsByObjectUserListAPIView(APIView):
+class BillsByObjectUserListAPIView(PaginationMixin, APIView):
     """
     Список счетов, отфильтрованных по пользователю объекта (не по создателю счета)
     """
@@ -529,43 +477,23 @@ class BillsByObjectUserListAPIView(APIView):
             user = request.user
             
             # Фильтруем по пользователю объекта (UserObject.user), а не по создателю счета
-            queryset = Bills.objects.filter(object_id__user=user).select_related('object_id', 'user', 'object_id__user').order_by('-created_at')
+            # prefetch_related qo'shildi - N+1 query muammosini hal qilish uchun
+            queryset = Bills.objects.filter(object_id__user=user)\
+                .select_related('object_id', 'user', 'object_id__user')\
+                .prefetch_related('bill_documents')\
+                .order_by('-created_at')
             
-            # Пагинация
-            page = request.query_params.get('page', 1)
-            limit = request.query_params.get('limit', 10)
-            
-            try:
-                page = int(page)
-                limit = int(limit)
-            except ValueError:
-                page = 1
-                limit = 10
-            
-            paginator = Paginator(queryset, limit)
-            
-            try:
-                bills = paginator.page(page)
-            except EmptyPage:
-                bills = paginator.page(paginator.num_pages)
-            except PageNotAnInteger:
-                bills = paginator.page(1)
+            # Pagination Mixin ishlatilmoqda
+            bills, paginator = self.paginate_queryset(queryset, request)
             
             serializer = BillsSerializer(bills, many=True, context={'request': request})
             
-            return Response({
-                'success': True,
-                'message': 'Счета получены успешно',
-                'data': serializer.data,
-                'pagination': {
-                    'current_page': bills.number,
-                    'total_pages': paginator.num_pages,
-                    'total_items': paginator.count,
-                    'items_per_page': limit,
-                    'has_next': bills.has_next(),
-                    'has_previous': bills.has_previous(),
-                }
-            }, status=status.HTTP_200_OK)
+            return self.get_paginated_response(
+                bills, 
+                paginator, 
+                serializer.data, 
+                'Счета получены успешно'
+            )
             
         except Exception as e:
             return Response({

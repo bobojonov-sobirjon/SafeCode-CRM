@@ -4,13 +4,13 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from .models import Product, ProductImage, ProductSizes, FavoriteProduct, Category
 from .serializers import (
     ProductSerializer, ProductCreateUpdateSerializer,
     ProductImageSerializer, FavoriteProductSerializer, CategorySerializer
 )
 from apps.v1.accounts.error_handlers import get_error_message
+from apps.v1.documents.mixins import PaginationMixin
 
 
 class CategoryListAPIView(APIView):
@@ -32,7 +32,7 @@ class CategoryListAPIView(APIView):
             return Response({'success': False, 'message': get_error_message('server_error'), 'errors': {'detail': str(e)}}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class ProductListCreateAPIView(APIView):
+class ProductListCreateAPIView(PaginationMixin, APIView):
     """
     Список и создание продуктов
     """
@@ -116,6 +116,8 @@ class ProductListCreateAPIView(APIView):
             category = request.query_params.get('category', None)
             if category:
                 queryset = queryset.select_related("category").filter(category=category)
+            else:
+                queryset = queryset.select_related("category")
             
             # Фильтрация по name
             name = request.query_params.get('name', None)
@@ -127,51 +129,20 @@ class ProductListCreateAPIView(APIView):
             if article:
                 queryset = queryset.filter(article__icontains=article)
             
-            # Пагинация
-            page = request.query_params.get('page', 1)
-            limit = request.query_params.get('limit', 10)
+            # prefetch_related qo'shildi - N+1 query muammosini hal qilish uchun
+            queryset = queryset.prefetch_related('productimage_set', 'productsizes_set')
             
-            try:
-                page = int(page)
-                limit = int(limit)
-            except (ValueError, TypeError):
-                page = 1
-                limit = 10
-            
-            # Ограничиваем максимальный limit
-            if limit > 100:
-                limit = 100
-            if limit < 1:
-                limit = 10
-            
-            paginator = Paginator(queryset, limit)
-            total_items = paginator.count
-            total_pages = paginator.num_pages
-            
-            try:
-                products_page = paginator.page(page)
-            except PageNotAnInteger:
-                products_page = paginator.page(1)
-                page = 1
-            except EmptyPage:
-                products_page = paginator.page(total_pages)
-                page = total_pages
+            # Pagination Mixin ishlatilmoqda
+            products_page, paginator = self.paginate_queryset(queryset, request)
             
             serializer = ProductSerializer(products_page, many=True, context={'request': request})
             
-            return Response({
-                'success': True,
-                'message': 'Список продуктов получен успешно',
-                'data': serializer.data,
-                'pagination': {
-                    'current_page': page,
-                    'total_pages': total_pages,
-                    'total_items': total_items,
-                    'limit': limit,
-                    'has_next': products_page.has_next(),
-                    'has_previous': products_page.has_previous(),
-                }
-            }, status=status.HTTP_200_OK)
+            return self.get_paginated_response(
+                products_page,
+                paginator,
+                serializer.data,
+                'Список продуктов получен успешно'
+            )
             
         except Exception as e:
             return Response({

@@ -28,6 +28,11 @@ class UserObject(models.Model):
         verbose_name = 'Объект пользователя'
         verbose_name_plural = '01. Объекты пользователей'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at'], name='uo_user_created_idx'),
+            models.Index(fields=['status', '-created_at'], name='uo_status_created_idx'),
+            models.Index(fields=['is_deleted', '-created_at'], name='uo_deleted_created_idx'),
+        ]
         
     def __str__(self):
         return self.name
@@ -45,6 +50,10 @@ class UserObjectWorkers(models.Model):
     class Meta:
         verbose_name = 'Работник объекта пользователя'
         verbose_name_plural = '02. Работники объектов пользователей'
+        indexes = [
+            models.Index(fields=['user_object', 'user'], name='uow_obj_user_idx'),
+            models.Index(fields=['is_finished'], name='uow_finished_idx'),
+        ]
 
 
 class UserObjectDocuments(models.Model):
@@ -59,6 +68,10 @@ class UserObjectDocuments(models.Model):
     class Meta:
         verbose_name = 'Документ объекта пользователя'
         verbose_name_plural = '03. Документы объектов пользователей'
+        indexes = [
+            models.Index(fields=['user_object', '-created_at'], name='uod_obj_created_idx'),
+            models.Index(fields=['user', '-created_at'], name='uod_user_created_idx'),
+        ]
 
 
 class UserObjectDocumentItems(models.Model):

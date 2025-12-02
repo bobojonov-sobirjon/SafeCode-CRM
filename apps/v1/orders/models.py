@@ -113,6 +113,11 @@ class Order(models.Model):
         verbose_name = 'Заказ'
         verbose_name_plural = 'Заказы'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at'], name='orders_user_created_idx'),
+            models.Index(fields=['status', '-created_at'], name='orders_status_created_idx'),
+            models.Index(fields=['order_number'], name='orders_number_idx'),
+        ]
     
     def __str__(self):
         return f"Заказ {self.order_number} - {self.user.get_full_name()}"
@@ -152,6 +157,10 @@ class OrderItem(models.Model):
         verbose_name = 'Элемент заказа'
         verbose_name_plural = 'Элементы заказа'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['order', '-created_at'], name='order_items_order_created_idx'),
+            models.Index(fields=['product'], name='order_items_product_idx'),
+        ]
     
     def __str__(self):
         return f"{self.product.name} x{self.quantity} - {self.order.order_number}"
