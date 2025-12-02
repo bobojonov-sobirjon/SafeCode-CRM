@@ -51,11 +51,11 @@ class NotificationSerializer(serializers.ModelSerializer):
     
     def get_target(self, obj):
         """
-        Получение информации о связанном объекте (например, Bills)
+        Получение информации о связанном объекте (например, Bills, JournalsAndActs)
         """
         if obj.target:
             # Если target - это Bills
-            from apps.v1.documents.models import Bills
+            from apps.v1.documents.models import Bills, JournalsAndActs
             if isinstance(obj.target, Bills):
                 return {
                     'type': 'bill',
@@ -63,6 +63,14 @@ class NotificationSerializer(serializers.ModelSerializer):
                     'price': str(obj.target.price) if obj.target.price else None,
                     'status': obj.target.status,
                     'comment': obj.target.comment,
+                }
+            # Если target - это JournalsAndActs
+            elif isinstance(obj.target, JournalsAndActs):
+                return {
+                    'type': 'journal_and_act',
+                    'id': obj.target.id,
+                    'type_value': obj.target.type,
+                    'date': obj.target.date.isoformat() if obj.target.date else None,
                 }
             # Если target - это другой тип объекта
             return {

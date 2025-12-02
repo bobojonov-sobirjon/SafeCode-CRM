@@ -7,6 +7,7 @@ urlpatterns = [
     # Journals and Acts endpoints
     path('journals-and-acts/', views.JournalsAndActsListCreateAPIView.as_view(), name='journals_and_acts_list_create'),
     path('journals-and-acts/<int:pk>/', views.JournalsAndActsDetailAPIView.as_view(), name='journals_and_acts_detail'),
+    path('journals-and-acts/by-object-user/', views.JournalsAndActsByObjectUserListAPIView.as_view(), name='journals_and_acts_by_object_user_list'),
     
     # Bills endpoints
     path('bills/', views.BillsListCreateAPIView.as_view(), name='bills_list_create'),

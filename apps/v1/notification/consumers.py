@@ -76,13 +76,19 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         """
         Отправка уведомления клиенту
         """
+        print(f"[DEBUG] notification_message received in WebSocket consumer")
+        print(f"[DEBUG] Event: {event}")
         notification = event['notification']
+        print(f"[DEBUG] Notification data: {notification}")
         
         # Отправляем уведомление через WebSocket
-        await self.send(text_data=json.dumps({
+        message = json.dumps({
             'type': 'notification',
             'data': notification
-        }, ensure_ascii=False))
+        }, ensure_ascii=False)
+        print(f"[DEBUG] Sending message to WebSocket client: {message}")
+        await self.send(text_data=message)
+        print(f"[DEBUG] Message sent successfully")
     
     @database_sync_to_async
     def get_user_from_token(self, token):

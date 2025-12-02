@@ -53,6 +53,40 @@ class JournalsAndActs(models.Model):
         return f"Журнал/Акт #{self.id} - {self.object_id.name if self.object_id else 'N/A'}"
 
 
+class JournalAndActDocuments(models.Model):
+    """
+    Документы журнала и акта
+    """
+    journal_and_act_id = models.ForeignKey(
+        JournalsAndActs,
+        on_delete=models.CASCADE,
+        related_name='journal_and_act_documents',
+    )
+    document = models.FileField(
+        upload_to='journal_and_act_documents/',
+        verbose_name='Документ',
+        null=True,
+        blank=True
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Дата создания'
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name='Дата обновления'
+    )
+    objects = models.Manager()
+    
+    class Meta:
+        verbose_name = 'Документ журнала и акта'
+        verbose_name_plural = 'Документы журнала и акта'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Документ #{self.id} - {self.journal_and_act_id.object_id.name if self.journal_and_act_id.object_id else 'N/A'}"
+
+
 class Bills(models.Model):
     """
     Счета
@@ -110,3 +144,37 @@ class Bills(models.Model):
     
     def __str__(self):
         return f"Счет #{self.id} - {self.object_id.name if self.object_id else 'N/A'}"
+
+
+class BillDocuments(models.Model):
+    """
+    Документы счета
+    """
+    bill_id = models.ForeignKey(
+        Bills,
+        on_delete=models.CASCADE,
+        related_name='bill_documents',
+    )
+    document = models.FileField(
+        upload_to='bill_documents/',
+        verbose_name='Документ',
+        null=True,
+        blank=True
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Дата создания'
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name='Дата обновления'
+    )
+    objects = models.Manager()  
+    
+    class Meta:
+        verbose_name = 'Документ счета'
+        verbose_name_plural = 'Документы счета'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Документ #{self.id} - {self.bill_id.object_id.name if self.bill_id.object_id else 'N/A'}"
