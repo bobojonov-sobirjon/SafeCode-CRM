@@ -126,7 +126,13 @@ class LoginAPIView(APIView):
     )
     def post(self, request):
         try:
-            serializer = LoginSerializer(data=request.data)
+            # Swagger UI dan kelgan data ni to'g'ri formatga o'tkazish
+            data = request.data
+            # Agar data dict ichida bo'lsa, uni to'g'ridan-to'g'ri olamiz
+            if isinstance(data, dict) and 'data' in data:
+                data = data['data']
+            
+            serializer = LoginSerializer(data=data)
             
             if serializer.is_valid():
                 user = serializer.validated_data['user']
