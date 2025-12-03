@@ -13,8 +13,16 @@ def send_notification_to_user(user, message, verb, actor=None, user_object=None)
     """
     Создание уведомления и отправка через WebSocket
     """
+    print(f"[DEBUG] ========== send_notification_to_user called ==========")
+    print(f"[DEBUG] User: id={user.id}, email={user.email}")
+    print(f"[DEBUG] Message: {message}")
+    print(f"[DEBUG] Verb: {verb}")
+    print(f"[DEBUG] Actor: {actor.id if actor else None}")
+    print(f"[DEBUG] User object: {user_object.id if user_object else None}")
+    
     try:
         # Создаем уведомление в БД
+        print(f"[DEBUG] Creating notification in database...")
         notification = Notification.objects.create(
             recipient=user,
             actor=actor,
@@ -23,35 +31,49 @@ def send_notification_to_user(user, message, verb, actor=None, user_object=None)
             user_object=user_object,
             category='user_object'
         )
+        print(f"[DEBUG] Notification created: id={notification.id}")
         
         # Отправляем через WebSocket
         try:
+            print(f"[DEBUG] Getting channel layer...")
             channel_layer = get_channel_layer()
+            print(f"[DEBUG] Channel layer: {channel_layer}")
             if channel_layer:
-                async_to_sync(channel_layer.group_send)(
-                    f"user_{user.id}",
-                    {
-                        "type": "notification_message",
-                        "notification": {
-                            "id": notification.id,
-                            "message": message,
-                            "verb": verb,
-                            "actor": {
-                                "id": actor.id,
-                                "first_name": actor.first_name,
-                                "last_name": actor.last_name,
-                            } if actor else None,
-                            "user_object": {
-                                "id": user_object.id,
-                                "name": user_object.name,
-                            } if user_object else None,
-                            "created_at": notification.created_at.isoformat(),
-                            "is_read": notification.is_read,
-                        }
+                group_name = f"user_{user.id}"
+                print(f"[DEBUG] Sending to WebSocket group: {group_name}")
+                notification_data = {
+                    "type": "notification_message",
+                    "notification": {
+                        "id": notification.id,
+                        "message": message,
+                        "verb": verb,
+                        "actor": {
+                            "id": actor.id,
+                            "first_name": actor.first_name,
+                            "last_name": actor.last_name,
+                        } if actor else None,
+                        "user_object": {
+                            "id": user_object.id,
+                            "name": user_object.name,
+                        } if user_object else None,
+                        "created_at": notification.created_at.isoformat(),
+                        "is_read": notification.is_read,
                     }
+                }
+                print(f"[DEBUG] Notification data to send: {json.dumps(notification_data, indent=2, ensure_ascii=False)}")
+                print(f"[DEBUG] Calling channel_layer.group_send...")
+                async_to_sync(channel_layer.group_send)(
+                    group_name,
+                    notification_data
                 )
+                print(f"[DEBUG] ========== group_send called successfully for group {group_name} ==========")
+            else:
+                print(f"[DEBUG] WARNING: Channel layer is None!")
         except Exception as e:
             # Если WebSocket недоступен, просто создаем уведомление в БД
+            print(f"[DEBUG] ERROR: Failed to send notification via WebSocket: {str(e)}")
+            import traceback
+            print(f"[DEBUG] Traceback: {traceback.format_exc()}")
             import logging
             logger = logging.getLogger(__name__)
             logger.warning(f"Не удалось отправить уведомление через WebSocket для пользователя {user.id}: {str(e)}")
@@ -59,6 +81,9 @@ def send_notification_to_user(user, message, verb, actor=None, user_object=None)
         return notification
     except Exception as e:
         # Логируем ошибку создания уведомления
+        print(f"[DEBUG] ERROR: Failed to create notification: {str(e)}")
+        import traceback
+        print(f"[DEBUG] Traceback: {traceback.format_exc()}")
         import logging
         logger = logging.getLogger(__name__)
         logger.error(f"Ошибка создания уведомления для пользователя {user.id}: {str(e)}")
