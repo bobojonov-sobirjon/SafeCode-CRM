@@ -8,6 +8,10 @@ from apps.v1.accounts.models import CustomUser
 from apps.v1.notification.models import Notification
 import json
 
+print(f"[DEBUG] ========== signals.py module loaded ==========")
+print(f"[DEBUG] UserObject model: {UserObject}")
+print(f"[DEBUG] About to register signals...")
+
 
 def send_notification_to_user(user, message, verb, actor=None, user_object=None):
     """
@@ -90,6 +94,7 @@ def send_notification_to_user(user, message, verb, actor=None, user_object=None)
         return None
 
 
+print(f"[DEBUG] Registering user_object_created signal...")
 @receiver(post_save, sender=UserObject)
 def user_object_created(sender, instance, created, **kwargs):
     """

@@ -208,6 +208,9 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
+# Channel Layers - InMemoryChannelLayer faqat bir process ichida ishlaydi
+# Agar Gunicorn va Daphne alohida processlarda ishlasa, Redis kerak
+# Lekin agar bitta processda (Daphne) ishlatsangiz, InMemoryChannelLayer yetarli
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels.layers.InMemoryChannelLayer'
