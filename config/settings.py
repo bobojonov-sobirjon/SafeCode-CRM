@@ -2,6 +2,36 @@
 from config.libraries.rest_framework import REST_FRAMEWORK
 from config.libraries.jwt import SIMPLE_JWT
 from config.libraries.cors import CSRF_TRUSTED_ORIGINS, CORS_ALLOWED_ORIGINS, CORS_ALLOW_ALL_ORIGINS, CORS_ORIGIN_ALLOW_ALL, CORS_ALLOW_CREDENTIALS, CORS_ORIGIN_WHITELIST
+
+# CORS va CSRF sozlamalari
+CSRF_TRUSTED_ORIGINS = CSRF_TRUSTED_ORIGINS
+CORS_ALLOWED_ORIGINS = CORS_ALLOWED_ORIGINS
+CORS_ALLOW_ALL_ORIGINS = CORS_ALLOW_ALL_ORIGINS
+CORS_ORIGIN_ALLOW_ALL = CORS_ORIGIN_ALLOW_ALL
+CORS_ALLOW_CREDENTIALS = CORS_ALLOW_CREDENTIALS
+CORS_ORIGIN_WHITELIST = CORS_ORIGIN_WHITELIST
+
+# CORS qo'shimcha sozlamalar
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 from config.libraries.email import EMAIL_BACKEND, EMAIL_HOST, EMAIL_PORT, EMAIL_USE_TLS, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD, DEFAULT_FROM_EMAIL
 from config.libraries.cache import CACHES
 from config.libraries.swagger import SWAGGER_SETTINGS, SWAGGER_UI_OAUTH2_CONFIG
@@ -223,3 +253,7 @@ SWAGGER_SETTINGS = {
     'USE_SESSION_AUTH': False,
     'TEMPLATE': 'drf_yasg/swagger-ui.html',
 }
+
+# HTTPS uchun sozlamalar
+USE_TLS = True  # Production uchun HTTPS ishlatiladi
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # Nginx orqali HTTPS
