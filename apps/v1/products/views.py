@@ -156,26 +156,19 @@ class ProductListCreateAPIView(PaginationMixin, APIView):
     @swagger_auto_schema(
         operation_description="Создание нового продукта. Используйте multipart/form-data для загрузки изображений. Поле images_list может содержать несколько файлов.",
         tags=['Products'],
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'name': openapi.Schema(type=openapi.TYPE_STRING, description='Название продукта'),
-                'description': openapi.Schema(type=openapi.TYPE_STRING, description='Описание продукта'),
-                'price': openapi.Schema(type=openapi.TYPE_NUMBER, description='Цена продукта'),
-                'category': openapi.Schema(type=openapi.TYPE_INTEGER, description='ID категории'),
-                'stock': openapi.Schema(type=openapi.TYPE_INTEGER, description='Количество на складе'),
-                'article': openapi.Schema(type=openapi.TYPE_STRING, description='Артикул'),
-                'is_active': openapi.Schema(type=openapi.TYPE_BOOLEAN, description='Активен'),
-                'images_list': openapi.Schema(
-                    type=openapi.TYPE_ARRAY,
-                    items=openapi.Schema(type=openapi.TYPE_FILE),
-                    description='Список изображений (файлы)'
-                ),
-                'width': openapi.Schema(type=openapi.TYPE_INTEGER, description='Ширина'),
-                'height': openapi.Schema(type=openapi.TYPE_INTEGER, description='Высота'),
-                'depth': openapi.Schema(type=openapi.TYPE_INTEGER, description='Глубина'),
-            }
-        ),
+        manual_parameters=[
+            openapi.Parameter('name', openapi.IN_FORM, description='Название продукта', type=openapi.TYPE_STRING, required=True),
+            openapi.Parameter('description', openapi.IN_FORM, description='Описание продукта', type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('price', openapi.IN_FORM, description='Цена продукта', type=openapi.TYPE_NUMBER, required=False),
+            openapi.Parameter('category', openapi.IN_FORM, description='ID категории', type=openapi.TYPE_INTEGER, required=False),
+            openapi.Parameter('stock', openapi.IN_FORM, description='Количество на складе', type=openapi.TYPE_INTEGER, required=False),
+            openapi.Parameter('article', openapi.IN_FORM, description='Артикул', type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('is_active', openapi.IN_FORM, description='Активен', type=openapi.TYPE_BOOLEAN, required=False),
+            openapi.Parameter('images_list', openapi.IN_FORM, description='Изображения для загрузки (можно загрузить несколько файлов, используйте images_list[0], images_list[1] и т.д. или просто images_list для нескольких файлов)', type=openapi.TYPE_FILE, required=False),
+            openapi.Parameter('width', openapi.IN_FORM, description='Ширина (мм)', type=openapi.TYPE_INTEGER, required=False),
+            openapi.Parameter('height', openapi.IN_FORM, description='Высота (мм)', type=openapi.TYPE_INTEGER, required=False),
+            openapi.Parameter('depth', openapi.IN_FORM, description='Глубина (мм)', type=openapi.TYPE_INTEGER, required=False),
+        ],
         consumes=['multipart/form-data'],
         responses={
             201: openapi.Response(
@@ -196,10 +189,10 @@ class ProductListCreateAPIView(PaginationMixin, APIView):
     )
     def post(self, request):
         try:
-            # Объединяем данные из request.data и request.FILES для form-data
-            data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
-            
-            serializer = ProductCreateUpdateSerializer(data=data, context={'request': request})
+            # DRF MultiPartParser уже объединяет request.data и request.FILES
+            # Не копируем request.data, чтобы избежать ошибки pickling файлов
+            # Передаем request.data напрямую, так как он уже содержит все данные
+            serializer = ProductCreateUpdateSerializer(data=request.data, context={'request': request})
             
             if serializer.is_valid():
                 product = serializer.save()
@@ -295,10 +288,10 @@ class ProductDetailAPIView(APIView):
                     'message': 'Продукт не найден'
                 }, status=status.HTTP_404_NOT_FOUND)
             
-            # Объединяем данные из request.data и request.FILES для form-data
-            data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
-            
-            serializer = ProductCreateUpdateSerializer(product, data=data, context={'request': request})
+            # DRF MultiPartParser уже объединяет request.data и request.FILES
+            # Не копируем request.data, чтобы избежать ошибки pickling файлов
+            # Передаем request.data напрямую, так как он уже содержит все данные
+            serializer = ProductCreateUpdateSerializer(product, data=request.data, context={'request': request})
             
             if serializer.is_valid():
                 product = serializer.save()

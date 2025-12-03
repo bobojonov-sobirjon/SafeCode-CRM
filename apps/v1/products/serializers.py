@@ -127,46 +127,18 @@ class ProductCreateUpdateSerializer(FileValidationMixin, serializers.ModelSerial
                     f'Недопустимый формат изображения {image.name}. Разрешенные форматы: {", ".join(self.ALLOWED_IMAGE_EXTENSIONS)}'
                 )
             
-            # Проверка, что файл является изображением (PIL validation)
-            try:
-                from PIL import Image
-                # Файлni qayta o'qish uchun boshiga qaytaramiz
-                image.seek(0)
-                img = Image.open(image)
-                # Rasm formatini tekshirish
-                img.verify()
-                # verify() faylni yopadi, shuning uchun qayta ochamiz
-                image.seek(0)
-            except Exception as e:
-                raise serializers.ValidationError(
-                    f'Файл {image.name} не является корректным изображением: {str(e)}'
-                )
-            
             # Очистка имени файла
             from django.utils.text import get_valid_filename
             image.name = get_valid_filename(image.name)
+            
+            # Fayl pozitsiyasini boshiga qaytarish (agar o'qilgan bo'lsa)
+            if hasattr(image, 'seek'):
+                try:
+                    image.seek(0)
+                except (AttributeError, ValueError):
+                    pass  # Agar seek() ishlamasa, e'tibor bermaymiz
         
         return value
-    
-    def to_internal_value(self, data):
-        """
-        Обработка form-data для images_list
-        """
-        request = self.context.get('request')
-        if request and hasattr(request, 'FILES'):
-            files = request.FILES
-            images_files = files.getlist('images_list')
-            if images_files:
-                if hasattr(data, 'copy'):
-                    mutable_data = data.copy()
-                elif isinstance(data, dict):
-                    mutable_data = data.copy()
-                else:
-                    mutable_data = dict(data)
-                mutable_data['images_list'] = images_files
-                data = mutable_data
-        
-        return super().to_internal_value(data)
     
     def create(self, validated_data):
         """
