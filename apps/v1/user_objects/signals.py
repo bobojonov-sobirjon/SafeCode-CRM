@@ -95,23 +95,46 @@ def user_object_created(sender, instance, created, **kwargs):
     """
     Когда создается UserObject, отправляем уведомление всем администраторам
     """
+    print(f"[DEBUG] ========== user_object_created signal triggered ==========")
+    print(f"[DEBUG] Created: {created}")
+    print(f"[DEBUG] Instance ID: {instance.id}")
+    print(f"[DEBUG] Instance name: {instance.name}")
+    print(f"[DEBUG] Instance user: id={instance.user.id}, email={instance.user.email}")
+    
     if created:
+        print(f"[DEBUG] UserObject was created, looking for admin users...")
         # Получаем всех пользователей с ролью "Администратор"
         admin_group = Group.objects.filter(name='Администратор').first()
+        print(f"[DEBUG] Admin group: {admin_group}")
+        
         if admin_group:
             admin_users = CustomUser.objects.filter(groups=admin_group, is_active=True)
+            admin_count = admin_users.count()
+            print(f"[DEBUG] Found {admin_count} admin users")
             
-            creator_name = instance.user.get_full_name() or instance.user.email
-            message = f"Новый объект создан пользователем {creator_name}"
-            
-            for admin in admin_users:
-                send_notification_to_user(
-                    user=admin,
-                    message=message,
-                    verb="object_created",
-                    actor=instance.user,
-                    user_object=instance
-                )
+            if admin_count > 0:
+                creator_name = instance.user.get_full_name() or instance.user.email
+                message = f"Новый объект создан пользователем {creator_name}"
+                print(f"[DEBUG] Message: {message}")
+                
+                for admin in admin_users:
+                    print(f"[DEBUG] Sending notification to admin: id={admin.id}, email={admin.email}")
+                    send_notification_to_user(
+                        user=admin,
+                        message=message,
+                        verb="object_created",
+                        actor=instance.user,
+                        user_object=instance
+                    )
+                    print(f"[DEBUG] Notification sent to admin {admin.id}")
+            else:
+                print(f"[DEBUG] WARNING: No active admin users found!")
+        else:
+            print(f"[DEBUG] ERROR: Admin group 'Администратор' not found!")
+    else:
+        print(f"[DEBUG] UserObject was updated, not created. Skipping notification.")
+    
+    print(f"[DEBUG] ========== user_object_created signal finished ==========")
 
 
 @receiver(post_save, sender=UserObjectWorkers)
