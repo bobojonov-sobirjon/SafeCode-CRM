@@ -2,6 +2,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from .models import Product, ProductImage, ProductSizes, FavoriteProduct, Category
@@ -37,6 +38,7 @@ class ProductListCreateAPIView(PaginationMixin, APIView):
     Список и создание продуктов
     """
     permission_classes = [AllowAny]
+    parser_classes = [MultiPartParser, FormParser]
     
     @swagger_auto_schema(
         operation_description="Получение списка всех продуктов с фильтрацией по name и article, с пагинацией",
@@ -174,7 +176,7 @@ class ProductListCreateAPIView(PaginationMixin, APIView):
                 'depth': openapi.Schema(type=openapi.TYPE_INTEGER, description='Глубина'),
             }
         ),
-        consumes=['application/json'],
+        consumes=['multipart/form-data'],
         responses={
             201: openapi.Response(
                 'Успешное создание продукта',

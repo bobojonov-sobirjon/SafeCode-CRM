@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Product, ProductImage, ProductSizes, FavoriteProduct, Category
+from apps.v1.documents.mixins import FileValidationMixin
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -76,13 +77,13 @@ class ProductSerializer(serializers.ModelSerializer):
         return CategorySerializer(obj.category, context=self.context).data
 
 
-class ProductCreateUpdateSerializer(serializers.ModelSerializer):
+class ProductCreateUpdateSerializer(FileValidationMixin, serializers.ModelSerializer):
     """
     Сериализатор для создания и обновления продукта
     Поддерживает form-data для загрузки изображений
     """
     images_list = serializers.ListField(
-        child=serializers.ImageField(),
+        child=serializers.FileField(allow_empty_file=False),
         required=False,
         allow_empty=True,
         write_only=True
@@ -91,12 +92,61 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
     height = serializers.IntegerField(required=False, allow_null=True, write_only=True)
     depth = serializers.IntegerField(required=False, allow_null=True, write_only=True)
     
+    # Rasm formatlari uchun maxsus validatsiya
+    ALLOWED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+    MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
+    
     class Meta:
         model = Product
         fields = [
             'name', 'description', 'price', 'stock', 'article',
             'is_active', 'images_list', 'width', 'height', 'depth', 'category'
         ]
+    
+    def validate_images_list(self, value):
+        """
+        Валидация списка изображений
+        """
+        if not value:
+            return value
+        
+        for image in value:
+            # Проверка размера файла
+            if image.size > self.MAX_IMAGE_SIZE:
+                raise serializers.ValidationError(
+                    f'Изображение {image.name} слишком большое. Максимальный размер: {self.MAX_IMAGE_SIZE / (1024 * 1024)}MB'
+                )
+            
+            # Проверка формата файла
+            file_extension = None
+            if '.' in image.name:
+                file_extension = '.' + image.name.rsplit('.', 1)[1].lower()
+            
+            if file_extension and file_extension not in self.ALLOWED_IMAGE_EXTENSIONS:
+                raise serializers.ValidationError(
+                    f'Недопустимый формат изображения {image.name}. Разрешенные форматы: {", ".join(self.ALLOWED_IMAGE_EXTENSIONS)}'
+                )
+            
+            # Проверка, что файл является изображением (PIL validation)
+            try:
+                from PIL import Image
+                # Файлni qayta o'qish uchun boshiga qaytaramiz
+                image.seek(0)
+                img = Image.open(image)
+                # Rasm formatini tekshirish
+                img.verify()
+                # verify() faylni yopadi, shuning uchun qayta ochamiz
+                image.seek(0)
+            except Exception as e:
+                raise serializers.ValidationError(
+                    f'Файл {image.name} не является корректным изображением: {str(e)}'
+                )
+            
+            # Очистка имени файла
+            from django.utils.text import get_valid_filename
+            image.name = get_valid_filename(image.name)
+        
+        return value
     
     def to_internal_value(self, data):
         """
