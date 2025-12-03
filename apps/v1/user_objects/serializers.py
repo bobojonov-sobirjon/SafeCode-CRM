@@ -116,6 +116,8 @@ class UserObjectWorkersAddSerializer(serializers.Serializer):
         from apps.v1.notification.models import Notification
         from channels.layers import get_channel_layer
         from asgiref.sync import async_to_sync
+        # Import here to avoid potential circular imports at module load time
+        from apps.v1.user_objects.signals import send_notification_to_user
         
         user_object_id = validated_data['user_objects_id']
         worker_ids = validated_data['worker_list']
@@ -151,6 +153,29 @@ class UserObjectWorkersAddSerializer(serializers.Serializer):
             created_workers = UserObjectWorkers.objects.bulk_create(workers_to_create)
         else:
             created_workers = []
+        
+        # ------------------------------------------------------------------
+        # Yangi workerlar uchun bildirishnoma yuborish
+        # Eslatma: bulk_create post_save signalini chaqirmaydi, shuning uchun
+        #          workerlarga notification ni qo'lda jo'natamiz.
+        # ------------------------------------------------------------------
+        if created_workers:
+            for worker in created_workers:
+                message_to_worker = (
+                    f"Объект '{user_object.name}' отправлен администратором для проверки"
+                )
+                try:
+                    send_notification_to_user(
+                        user=worker.user,
+                        message=message_to_worker,
+                        verb="object_assigned",
+                        actor=user_object.user,  # Создатель объекта
+                        user_object=user_object,
+                    )
+                except Exception:
+                    # Agar notification jo'natishda xatolik bo'lsa,
+                    # asosiy logikani to'xtatmaymiz.
+                    pass
         
         # Отправляем одно уведомление создателю объекта со всеми ролями
         if created_workers:
