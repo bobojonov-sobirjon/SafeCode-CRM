@@ -209,6 +209,37 @@ class JournalsAndActsDetailAPIView(APIView):
     def patch(self, request, pk):
         """PATCH использует тот же метод, что и PUT"""
         return self.put(request, pk)
+    
+    @swagger_auto_schema(
+        operation_description="Удаление журнала/акта по ID",
+        tags=['Journals and Acts'],
+        responses={200: 'OK', 404: 'Not Found', 401: 'Unauthorized'},
+        security=[{'Bearer': []}]
+    )
+    def delete(self, request, pk):
+        try:
+            user = request.user
+            journal_or_act = JournalsAndActs.objects.filter(pk=pk, user=user).first()
+            
+            if not journal_or_act:
+                return Response({
+                    'success': False,
+                    'message': 'Журнал/акт не найден'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            journal_or_act.delete()
+            
+            return Response({
+                'success': True,
+                'message': 'Журнал/акт удален успешно'
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': get_error_message('server_error'),
+                'errors': {'detail': str(e)}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class BillsListCreateAPIView(PaginationMixin, APIView):
@@ -407,6 +438,37 @@ class BillsDetailAPIView(APIView):
     def patch(self, request, pk):
         """PATCH использует тот же метод, что и PUT"""
         return self.put(request, pk)
+    
+    @swagger_auto_schema(
+        operation_description="Удаление счета по ID",
+        tags=['Bills'],
+        responses={200: 'OK', 404: 'Not Found', 401: 'Unauthorized'},
+        security=[{'Bearer': []}]
+    )
+    def delete(self, request, pk):
+        try:
+            user = request.user
+            bill = Bills.objects.filter(pk=pk, user=user).first()
+            
+            if not bill:
+                return Response({
+                    'success': False,
+                    'message': 'Счет не найден'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            bill.delete()
+            
+            return Response({
+                'success': True,
+                'message': 'Счет удален успешно'
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': get_error_message('server_error'),
+                'errors': {'detail': str(e)}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class JournalsAndActsByObjectUserListAPIView(PaginationMixin, APIView):

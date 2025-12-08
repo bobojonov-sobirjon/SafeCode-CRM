@@ -1047,9 +1047,52 @@ class CreateUserAPIView(APIView):
             if serializer.is_valid():
                 user = serializer.save()
                 
+                # Создаем пользователя как неактивного до подтверждения email
+                user.is_active = False
+                user.is_email_verified = False
+                
+                # Генерируем 6-значный код для подтверждения email
+                import random
+                verification_code = str(random.randint(100000, 999999))
+                
+                # Сохраняем код в email_verification_token (6 raqamli kod)
+                user.email_verification_token = verification_code
+                user.email_verification_token_expires = timezone.now() + timedelta(hours=24)  # 24 часа
+                user.save()
+                
+                # Отправляем email с кодом
+                subject = 'Код подтверждения регистрации - SafeCode CRM'
+                message = f"""
+Здравствуйте, {user.get_full_name()}!
+
+Ваш код подтверждения регистрации: {verification_code}
+
+Используйте этот код для подтверждения регистрации в SafeCode CRM. Код действителен в течение 24 часов.
+
+Если вы не регистрировались в SafeCode CRM, просто проигнорируйте это сообщение.
+
+С уважением,
+Команда SafeCode CRM
+                """
+                
+                try:
+                    send_mail(
+                        subject,
+                        message,
+                        settings.DEFAULT_FROM_EMAIL,
+                        [user.email],
+                        fail_silently=False,
+                    )
+                    email_sent = True
+                except Exception as mail_error:
+                    print(f"Email error: {str(mail_error)}")
+                    import logging
+                    logging.error(f"Failed to send verification email to {user.email}: {str(mail_error)}")
+                    email_sent = False
+                
                 return Response({
                     'success': True,
-                    'message': 'Пользователь создан успешно!',
+                    'message': 'Пользователь создан успешно! На email отправлен код подтверждения. Пожалуйста, проверьте почту и подтвердите регистрацию.' if email_sent else 'Пользователь создан успешно! Однако не удалось отправить email. Обратитесь к администратору.',
                     'data': {
                         'id': user.id,
                         'first_name': user.first_name,
@@ -1058,8 +1101,12 @@ class CreateUserAPIView(APIView):
                         'phone_number': user.phone_number,
                         'created_at': user.created_at,
                         'last_login': user.last_login,
+                        'is_email_verified': user.is_email_verified,
+                        'is_active': user.is_active,
                         'groups': [{'id': g.id, 'name': g.name} for g in user.groups.all()],
-                    }
+                    },
+                    'email_sent': email_sent,
+                    'verification_code': verification_code if settings.DEBUG and not email_sent else None,
                 }, status=status.HTTP_201_CREATED)
             
             return Response({
@@ -1560,6 +1607,130 @@ class AdminPasswordVerifyAPIView(APIView):
                 'message': get_error_message('validation_error'),
                 'errors': serializer.errors
             }, status=status.HTTP_400_BAD_REQUEST)
+            
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': get_error_message('server_error'),
+                'errors': {'detail': str(e)}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class VerifyUserEmailCodeAPIView(APIView):
+    """
+    Подтверждение email адреса пользователя по коду (для CreateUserAPIView)
+    """
+    permission_classes = [AllowAny]
+    
+    @swagger_auto_schema(
+        operation_description="Подтверждение email адреса пользователя по коду. Код отправляется на email при создании пользователя администратором.",
+        tags=['Admin'],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['email', 'code'],
+            properties={
+                'email': openapi.Schema(type=openapi.TYPE_STRING, description='Email адрес пользователя'),
+                'code': openapi.Schema(type=openapi.TYPE_STRING, description='6-значный код подтверждения'),
+            }
+        ),
+        responses={
+            200: openapi.Response(
+                'Email успешно подтвержден',
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                        'data': openapi.Schema(
+                            type=openapi.TYPE_OBJECT,
+                            properties={
+                                'id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                'first_name': openapi.Schema(type=openapi.TYPE_STRING),
+                                'last_name': openapi.Schema(type=openapi.TYPE_STRING),
+                                'email': openapi.Schema(type=openapi.TYPE_STRING),
+                                'phone_number': openapi.Schema(type=openapi.TYPE_STRING),
+                                'groups': openapi.Schema(type=openapi.TYPE_ARRAY),
+                            }
+                        ),
+                    }
+                )
+            ),
+            400: openapi.Response('Неверный или истекший код')
+        }
+    )
+    def post(self, request):
+        try:
+            email = request.data.get('email')
+            code = request.data.get('code')
+            
+            if not email:
+                return Response({
+                    'success': False,
+                    'message': 'Email обязателен для заполнения'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if not code:
+                return Response({
+                    'success': False,
+                    'message': 'Код обязателен для заполнения'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            try:
+                user = CustomUser.objects.get(email__iexact=email)
+            except CustomUser.DoesNotExist:
+                return Response({
+                    'success': False,
+                    'message': 'Пользователь с таким email не найден'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Проверка кода
+            if not user.email_verification_token or user.email_verification_token != code:
+                return Response({
+                    'success': False,
+                    'message': 'Неверный код подтверждения'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Проверка истечения кода
+            if user.email_verification_token_expires and user.email_verification_token_expires < timezone.now():
+                return Response({
+                    'success': False,
+                    'message': 'Код истек. Обратитесь к администратору для получения нового кода.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Активируем пользователя и подтверждаем email
+            user.is_email_verified = True
+            user.is_active = True
+            user.email_verification_token = None
+            user.email_verification_token_expires = None
+            user.save()
+            
+            # Возвращаем полную информацию о пользователе
+            return Response({
+                'success': True,
+                'message': 'Email успешно подтвержден! Ваш аккаунт активирован. Теперь вы можете войти в систему.',
+                'data': {
+                    'id': user.id,
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
+                    'email': user.email,
+                    'phone_number': user.phone_number,
+                    'id_organization': user.id_organization,
+                    'date_of_birth': user.date_of_birth,
+                    'address': user.address,
+                    'city': user.city,
+                    'street': user.street,
+                    'house': user.house,
+                    'apartment': user.apartment,
+                    'postal_index': user.postal_index,
+                    'email_newsletter': user.email_newsletter,
+                    'special_offers_notifications': user.special_offers_notifications,
+                    'avatar': user.avatar.url if user.avatar else None,
+                    'is_email_verified': user.is_email_verified,
+                    'is_active': user.is_active,
+                    'groups': [{'id': g.id, 'name': g.name} for g in user.groups.all()],
+                    'created_at': user.created_at,
+                }
+            }, status=status.HTTP_200_OK)
             
         except Exception as e:
             return Response({

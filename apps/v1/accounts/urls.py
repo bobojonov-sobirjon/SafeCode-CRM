@@ -28,6 +28,7 @@ urlpatterns = [
     # User management
     path('users/', views.ListUsersAPIView.as_view(), name='list_users'),
     path('users/create/', views.CreateUserAPIView.as_view(), name='create_user'),
+    path('users/verify-email-code/', views.VerifyUserEmailCodeAPIView.as_view(), name='verify_user_email_code'),
     path('users/<int:pk>/', views.UserDetailAPIView.as_view(), name='user_detail'),
     path('users/<int:pk>/update/', views.UpdateUserAPIView.as_view(), name='update_user'),
     path('users/<int:pk>/delete/', views.DeleteUserAPIView.as_view(), name='delete_user'),
