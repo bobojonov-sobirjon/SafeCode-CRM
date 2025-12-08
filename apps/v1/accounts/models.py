@@ -114,7 +114,43 @@ class CustomUser(AbstractUser):
         null=True,
         verbose_name="Время истечения токена"
     )
-
+    admin_sms_code = models.CharField(
+        max_length=6,
+        blank=True,
+        null=True,
+        verbose_name="SMS код для администратора",
+        help_text="SMS код для доступа к паролю пользователя"
+    )
+    admin_sms_code_expires = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name="Время истечения SMS кода"
+    )
+    email_verification_token = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        verbose_name="Токен подтверждения email",
+        help_text="Токен для подтверждения email адреса"
+    )
+    email_verification_token_expires = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name="Время истечения токена подтверждения email"
+    )
+    is_email_verified = models.BooleanField(
+        default=False,
+        verbose_name="Email подтвержден",
+        help_text="Подтвержден ли email адрес пользователя"
+    )
+    plain_password = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name="Пароль (plain text)",
+        help_text="Пароль в открытом виде (для администраторов)"
+    )
+ 
     # Use email as the username field
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'first_name', 'last_name']

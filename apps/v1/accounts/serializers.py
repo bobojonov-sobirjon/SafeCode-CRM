@@ -193,6 +193,12 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError({
                 'identifier': 'Ваш аккаунт деактивирован. Обратитесь к администратору.'
             })
+        
+        # Проверяем, подтвержден ли email
+        if not user.is_email_verified:
+            raise serializers.ValidationError({
+                'identifier': 'Ваш email не подтвержден. Пожалуйста, проверьте почту и подтвердите регистрацию по ссылке в письме.'
+            })
 
         attrs['user'] = user
         return attrs
@@ -851,3 +857,183 @@ class StorageUpdateSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'object': {'required': False, 'allow_null': True}
         }
+
+
+class AdminPasswordRequestSerializer(serializers.Serializer):
+    """
+    Сериализатор для запроса SMS кода администратором
+    """
+    pass  # Не требует полей, использует текущего авторизованного пользователя (админа)
+
+
+class AdminPasswordVerifySerializer(serializers.Serializer):
+    """
+    Сериализатор для верификации SMS кода и получения пароля пользователя
+    """
+    sms_code = serializers.CharField(
+        max_length=6,
+        min_length=6,
+        error_messages={
+            'required': 'SMS код обязателен для заполнения.',
+            'blank': 'SMS код не может быть пустым.',
+            'max_length': 'SMS код должен содержать 6 символов.',
+            'min_length': 'SMS код должен содержать 6 символов.'
+        }
+    )
+    user_id = serializers.IntegerField(
+        error_messages={
+            'required': 'ID пользователя обязателен для заполнения.',
+            'invalid': 'ID пользователя должен быть числом.'
+        }
+    )
+
+    def validate_user_id(self, value):
+        """
+        Проверка существования пользователя
+        """
+        try:
+            user = CustomUser.objects.get(id=value)
+        except CustomUser.DoesNotExist:
+            raise serializers.ValidationError('Пользователь с таким ID не найден.')
+        return value
+
+    def validate(self, attrs):
+        """
+        Проверка существования пользователя
+        SMS код проверяется в view, так как нужен доступ к request.user (admin)
+        """
+        user_id = attrs.get('user_id')
+        
+        try:
+            user = CustomUser.objects.get(id=user_id)
+        except CustomUser.DoesNotExist:
+            raise serializers.ValidationError({
+                'user_id': 'Пользователь с таким ID не найден.'
+            })
+        
+        attrs['user'] = user
+        return attrs
+
+
+class UserDetailSerializer(serializers.ModelSerializer):
+    """
+    Сериализатор для детальной информации о пользователе (без пароля)
+    """
+    groups = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = CustomUser
+        fields = [
+            'id', 'first_name', 'last_name', 'email', 'phone_number',
+            'id_organization', 'date_of_birth', 'address',
+            'city', 'street', 'house', 'apartment', 'postal_index',
+            'email_newsletter', 'special_offers_notifications',
+            'avatar', 'groups', 'created_at', 'updated_at', 'last_login',
+            'is_active', 'is_staff', 'is_superuser'
+        ]
+        read_only_fields = ['id', 'email', 'created_at', 'updated_at', 'last_login']
+    
+    def get_groups(self, obj):
+        """
+        Получение групп пользователя
+        """
+        return [{'id': g.id, 'name': g.name} for g in obj.groups.all()]
+
+
+class UserDetailWithPasswordSerializer(serializers.ModelSerializer):
+    """
+    Сериализатор для детальной информации о пользователе с паролем
+    Faqat kerakli maydonlar qaytariladi: first_name, last_name, email, phone, password
+    """
+    phone = serializers.CharField(source='phone_number', read_only=True)
+    
+    class Meta:
+        model = CustomUser
+        fields = [
+            'first_name', 'last_name', 'email', 'phone'
+        ]
+        read_only_fields = ['first_name', 'last_name', 'email', 'phone']
+
+
+class UserUpdateSerializer(serializers.ModelSerializer):
+    """
+    Сериализатор для обновления пользователя
+    """
+    groups = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Group.objects.all(),
+        required=False,
+        error_messages={
+            'does_not_exist': 'Группа не существует.',
+            'incorrect_type': 'Группа должна быть числом.'
+        }
+    )
+    
+    class Meta:
+        model = CustomUser
+        fields = [
+            'first_name', 'last_name', 'phone_number',
+            'id_organization', 'date_of_birth', 'address',
+            'city', 'street', 'house', 'apartment', 'postal_index',
+            'email_newsletter', 'special_offers_notifications',
+            'avatar', 'groups', 'is_active'
+        ]
+        extra_kwargs = {
+            'first_name': {'required': False},
+            'last_name': {'required': False},
+            'phone_number': {'required': False},
+        }
+    
+    def validate_phone_number(self, value):
+        """
+        Проверка уникальности номера телефона (исключая текущего пользователя)
+        """
+        if value and self.instance:
+            if CustomUser.objects.filter(phone_number=value).exclude(id=self.instance.id).exists():
+                raise serializers.ValidationError('Пользователь с таким номером телефона уже существует.')
+        return value
+    
+    def update(self, instance, validated_data):
+        """
+        Обновление пользователя
+        """
+        groups_data = validated_data.pop('groups', None)
+        
+        # Обновляем поля
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        
+        instance.save()
+        
+        # Обновляем группы если они указаны
+        if groups_data is not None:
+            instance.groups.set(groups_data)
+        
+        return instance
+
+
+class UserPasswordUpdateSerializer(serializers.Serializer):
+    """
+    Сериализатор для обновления пароля пользователя
+    """
+    password = serializers.CharField(
+        write_only=True,
+        min_length=8,
+        required=True,
+        error_messages={
+            'min_length': 'Пароль должен содержать минимум 8 символов.',
+            'required': 'Пароль обязателен для заполнения.',
+            'blank': 'Пароль не может быть пустым.'
+        }
+    )
+    
+    def validate_password(self, value):
+        """
+        Валидация пароля
+        """
+        try:
+            validate_password(value)
+        except ValidationError as e:
+            raise serializers.ValidationError(e.messages)
+        return value
+    

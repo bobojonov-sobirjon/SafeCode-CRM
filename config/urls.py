@@ -62,7 +62,7 @@ schema_view = get_schema_view(
         path('api/v1/orders/', include('apps.v1.orders.urls')),
     ],
     generator_class=CustomOpenAPISchemaGenerator,
-    url='https://api.safecode.flowersoptrf.ru',  # Production URL
+    url=settings.BASE_URL if not settings.DEBUG else None,  # Auto-detect in development, use BASE_URL in production
 )
 
 urlpatterns = [

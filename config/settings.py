@@ -146,23 +146,23 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
-
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME'),
-        'USER': os.getenv('DB_USER'),
-        'PASSWORD': os.getenv('DB_PASSWORD'),
-        'HOST': os.getenv('DB_HOST'),
-        'PORT': os.getenv('DB_PORT'),
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': os.getenv('DB_NAME'),
+#         'USER': os.getenv('DB_USER'),
+#         'PASSWORD': os.getenv('DB_PASSWORD'),
+#         'HOST': os.getenv('DB_HOST'),
+#         'PORT': os.getenv('DB_PORT'),
+#     }
+# }
 
 
 
@@ -257,3 +257,13 @@ SWAGGER_SETTINGS = {
 # HTTPS uchun sozlamalar
 USE_TLS = True  # Production uchun HTTPS ishlatiladi
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # Nginx orqali HTTPS
+
+BASE_URL = os.getenv('BASE_URL', '').strip()
+if not BASE_URL:
+    if DEBUG:
+        BASE_URL = 'http://127.0.0.1:8000'  # Local development (default port 8000)
+    else:
+        BASE_URL = 'https://api.safecode.flowersoptrf.ru'  # Production default
+
+if BASE_URL and not BASE_URL.startswith(('http://', 'https://')):
+    BASE_URL = f'http://{BASE_URL}'
