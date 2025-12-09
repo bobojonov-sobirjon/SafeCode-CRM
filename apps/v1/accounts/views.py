@@ -1649,7 +1649,16 @@ class VerifyUserEmailCodeAPIView(APIView):
                                 'last_name': openapi.Schema(type=openapi.TYPE_STRING),
                                 'email': openapi.Schema(type=openapi.TYPE_STRING),
                                 'phone_number': openapi.Schema(type=openapi.TYPE_STRING),
-                                'groups': openapi.Schema(type=openapi.TYPE_ARRAY),
+                                'groups': openapi.Schema(
+                                    type=openapi.TYPE_ARRAY,
+                                    items=openapi.Schema(
+                                        type=openapi.TYPE_OBJECT,
+                                        properties={
+                                            'id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                            'name': openapi.Schema(type=openapi.TYPE_STRING),
+                                        }
+                                    )
+                                ),
                             }
                         ),
                     }
