@@ -39,6 +39,7 @@ class CustomUserAdmin(UserAdmin):
         ('Уведомления', {'fields': ('email_newsletter', 'special_offers_notifications')}),
         ('Права доступа', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups')}),
         ('Важные даты', {'fields': ('last_login', 'date_joined', 'created_at', 'updated_at')}),
+        ('Email подтвержден', {'fields': ('is_email_verified', 'email_verification_token', 'email_verification_token_expires')}),
         ('Организация', {'fields': ('id_organization',)}),
     )
     
