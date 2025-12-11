@@ -365,6 +365,10 @@ class LoginAPIView(APIView):
             if serializer.is_valid():
                 user = serializer.validated_data['user']
                 
+                # Обновляем last_login
+                user.last_login = timezone.now()
+                user.save(update_fields=['last_login'])
+                
                 # Создаем JWT токены
                 refresh = RefreshToken.for_user(user)
                 
@@ -379,6 +383,7 @@ class LoginAPIView(APIView):
                             'email': user.email,
                             'phone_number': user.phone_number,
                             'id_organization': user.id_organization,
+                            'last_login': user.last_login,
                             'groups': [{'id': g.id, 'name': g.name} for g in user.groups.all()],
                         },
                         'tokens': {

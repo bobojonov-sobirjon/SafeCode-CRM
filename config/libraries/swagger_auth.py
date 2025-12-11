@@ -6,6 +6,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from django.utils import timezone
 from apps.v1.accounts.models import CustomUser
 
 
@@ -72,6 +73,10 @@ class SwaggerTokenView(APIView):
                 'error': 'invalid_grant',
                 'error_description': 'Invalid email or password'
             }, status=400)
+        
+        # Обновляем last_login
+        user.last_login = timezone.now()
+        user.save(update_fields=['last_login'])
         
         # Generate JWT tokens
         refresh = RefreshToken.for_user(user)

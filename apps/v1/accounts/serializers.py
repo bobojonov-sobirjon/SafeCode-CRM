@@ -221,9 +221,9 @@ class ProfileSerializer(serializers.ModelSerializer):
             'city', 'street', 'house', 'apartment', 'postal_index',
             'email_newsletter', 'special_offers_notifications',
             'avatar', 'groups', 'active_applications', 'completed_this_month',
-            'awaiting_payment', 'created_at', 'updated_at'
+            'awaiting_payment', 'created_at', 'updated_at', 'last_login'
         ]
-        read_only_fields = ['id', 'email', 'created_at', 'updated_at', 'active_applications', 'completed_this_month', 'awaiting_payment']
+        read_only_fields = ['id', 'email', 'created_at', 'updated_at', 'last_login', 'active_applications', 'completed_this_month', 'awaiting_payment']
     
     def get_groups(self, obj):
         """
