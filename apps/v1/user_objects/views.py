@@ -813,7 +813,7 @@ class UserObjectStatusUpdateAPIView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class UserObjectDocumentsListAPIView(APIView):
+class UserObjectDocumentsListAPIView(PaginationMixin, APIView):
     """
     Список документов объектов пользователя (фильтруется по текущему пользователю)
     """
